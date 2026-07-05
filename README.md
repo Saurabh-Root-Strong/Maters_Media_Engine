@@ -86,10 +86,16 @@ preferred), or force it with `MEDIA_ENGINE_PROVIDER=openai|anthropic`:
 Only `engine/llm.py` is provider-specific; the rest of the pipeline is
 provider-agnostic.
 
-**Cost** — a full run makes ~8 model calls (research, angle, 3 drafts, image
-spec, review). Default is `gpt-4o-mini` (~$0.03/run). Bump
-`MEDIA_ENGINE_OPENAI_MODEL` to `gpt-5.5` (~$1/run) only when top writing
-quality matters. Set spend alerts + a monthly cap in the OpenAI dashboard.
+**Cost** — default `gpt-4o-mini`. Two big levers:
+
+- **Web search** is ~80% of per-run cost. `MEDIA_ENGINE_WEB_SEARCH=off` →
+  near-free (~$0.005/run) using the model's own knowledge (not live-trending);
+  `on` → live trending news (~$0.02/run).
+- **Model** — bump `MEDIA_ENGINE_OPENAI_MODEL` to `gpt-5.5` (~$1/run) only when
+  top writing quality matters.
+
+All platform drafts are produced in a single combined call (fewer tokens than
+one call each). Set spend alerts + a monthly cap in the OpenAI dashboard.
 
 ## Tests
 

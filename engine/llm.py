@@ -32,6 +32,16 @@ _OPENAI_MODEL = os.environ.get("MEDIA_ENGINE_OPENAI_MODEL", "gpt-4o-mini")
 _ANTHROPIC_MODEL = os.environ.get("MEDIA_ENGINE_MODEL", "claude-opus-4-8")
 _ANTHROPIC_EFFORT = os.environ.get("MEDIA_ENGINE_EFFORT", "high")
 
+# Web search is the dominant per-run cost. Off -> research uses the model's own
+# knowledge (much cheaper, but not live-trending). Default on.
+_WEB_SEARCH = os.environ.get("MEDIA_ENGINE_WEB_SEARCH", "on").strip().lower() not in (
+    "off", "false", "0", "no",
+)
+
+
+def web_search_enabled() -> bool:
+    return _WEB_SEARCH
+
 _client = None
 
 
@@ -55,14 +65,16 @@ def _openai():
 
 
 def _openai_web(system: str, user: str) -> str:
-    resp = _openai().responses.create(
+    kwargs = dict(
         model=_OPENAI_MODEL,
-        tools=[{"type": "web_search_preview"}],
         input=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
     )
+    if _WEB_SEARCH:
+        kwargs["tools"] = [{"type": "web_search_preview"}]
+    resp = _openai().responses.create(**kwargs)
     return (resp.output_text or "").strip()
 
 
@@ -103,8 +115,9 @@ def _anthropic_web(system: str, user: str, max_continuations: int = 6) -> str:
     kwargs = dict(
         model=_ANTHROPIC_MODEL, max_tokens=8000, system=system,
         thinking={"type": "adaptive"}, output_config={"effort": _ANTHROPIC_EFFORT},
-        tools=[_WEB_SEARCH_TOOL],
     )
+    if _WEB_SEARCH:
+        kwargs["tools"] = [_WEB_SEARCH_TOOL]
     resp = client.messages.create(messages=[{"role": "user", "content": user}], **kwargs)
     cont = 0
     while resp.stop_reason == "pause_turn" and cont < max_continuations:

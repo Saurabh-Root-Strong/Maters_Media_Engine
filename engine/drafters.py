@@ -87,10 +87,37 @@ def redraft(platform: str, spec: dict, brief: dict, angle: dict, issues: list[st
 
 
 def draft_all(brief: dict, angle: dict, selected: list[str] | None = None) -> dict:
-    """Draft the selected platforms (default: all in the config)."""
+    """Draft all selected platforms in ONE call (cheaper than one call each).
+
+    A combined schema returns a draft per platform; each platform's own style +
+    limits go in the shared system prompt. Same output shape as before:
+    {platform_key: draft_dict}.
+    """
     platforms = _load_platforms()
     if selected:
         platforms = {k: v for k, v in platforms.items() if k in selected}
-    return {
-        key: draft_one(key, spec, brief, angle) for key, spec in platforms.items()
+
+    props = {key: _schema_for(spec) for key, spec in platforms.items()}
+    schema = {
+        "type": "object",
+        "properties": props,
+        "required": list(platforms),
+        "additionalProperties": False,
     }
+
+    rule_blocks = "\n\n".join(
+        f"=== {spec['label']} (key: {key}) ===\n{_system_for(spec)}"
+        for key, spec in platforms.items()
+    )
+    system = (
+        "You are an expert multi-platform social writer. Write ONE post for EACH "
+        "platform below, each in its own native voice, all landing the same key "
+        "message using only verified facts from the brief. Return one object with "
+        f"a key per platform ({', '.join(platforms)}).\n\n" + rule_blocks
+    )
+    user = (
+        "ANGLE:\n" + json.dumps(angle, indent=2)
+        + "\n\nBRIEF:\n" + json.dumps(brief, indent=2)
+        + "\n\nWrite every post now."
+    )
+    return llm.structured(system, user, schema, max_tokens=3500)
