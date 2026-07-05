@@ -34,13 +34,24 @@ instagram:
 twitter:
   label: Twitter/X
   style: >
-    Single short burst. One sharp hook line that stands alone. No thread.
-    Punchy, opinionated, quotable. At most 2 hashtags. Fit comfortably under
-    the limit — do not pad to fill it.
-  format: ""     # <- paste your tweet format here
+    Single analytical tweet, finance-analyst voice. No thread.
+  format: |
+    Write ONE analytical tweet — a sharp market take, NOT a topic label.
+
+    NEVER write shallow posts like "Crude Oil is trending today #CrudeOil
+    #StockMarket". Instead:
+    - Open with a concrete hook: a specific number/move framed as a question,
+      e.g. "Crude oil rising 5% — really bad for Indian stocks?".
+    - Give a specific, contrarian-aware insight: name who is hurt AND who
+      benefits (sectors or specific companies), e.g. "Aviation & paint face
+      margin pressure, while upstream producers like ONGC benefit".
+    - Close with an investor-framing question, e.g. "temporary or sustained?".
+
+    Concrete, specific, analytical. Only verified facts from the brief — if the
+    brief lacks specific numbers/companies, stay accurate and don't invent them.
   caption_max_chars: 280
   hashtags_min: 0
-  hashtags_max: 2
+  hashtags_max: 3
   needs_image: false
 
 linkedin:

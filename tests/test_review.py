@@ -12,13 +12,13 @@ def test_worst_ordering():
 
 def test_validate_catches_char_and_hashtag_limits():
     drafts = {
-        "twitter": {"caption": "x" * 300, "hashtags": ["a", "b", "c"]},
+        "twitter": {"caption": "x" * 300, "hashtags": ["a", "b", "c", "d"]},
         "instagram": {"caption": "ok", "hashtags": ["a", "b", "c", "d"]},
     }
     v = validate(drafts)
     msgs = [i["msg"] for i in v["twitter"]]
     assert any("300" in m and "280" in m for m in msgs)      # over char limit
-    assert any("outside [0,2]" in m for m in msgs)           # too many hashtags
+    assert any("outside [0,3]" in m for m in msgs)           # too many hashtags
     hv = hard_violations(v)
     assert "twitter" in hv          # 4 hashtags is valid for instagram (3-5), so no IG hard-fail
     assert "instagram" not in hv
