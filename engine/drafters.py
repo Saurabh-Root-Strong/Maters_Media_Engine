@@ -90,7 +90,10 @@ def redraft(platform: str, spec: dict, brief: dict, angle: dict, issues: list[st
         + "\n- ".join(issues)
         + f"\n\nRewrite the {spec['label']} post, keeping everything else good."
     )
-    return llm.structured(_system_for(spec), user, _schema_for(spec), max_tokens=3000)
+    draft = llm.structured(_system_for(spec), user, _schema_for(spec), max_tokens=3000)
+    if spec.get("mentions"):
+        draft["caption"] = draft["caption"].rstrip() + "\n\n" + " ".join(spec["mentions"])
+    return draft
 
 
 def draft_all(brief: dict, angle: dict, selected: list[str] | None = None) -> dict:
@@ -127,4 +130,12 @@ def draft_all(brief: dict, angle: dict, selected: list[str] | None = None) -> di
         + "\n\nBRIEF:\n" + json.dumps(brief, indent=2)
         + "\n\nWrite every post now."
     )
-    return llm.structured(system, user, schema, max_tokens=3500)
+    drafts = llm.structured(system, user, schema, max_tokens=3500)
+
+    # Append fixed account @mentions verbatim (kept out of the LLM so handles
+    # are never misspelled or invented).
+    for key, spec in platforms.items():
+        mentions = spec.get("mentions")
+        if mentions and key in drafts:
+            drafts[key]["caption"] = drafts[key]["caption"].rstrip() + "\n\n" + " ".join(mentions)
+    return drafts

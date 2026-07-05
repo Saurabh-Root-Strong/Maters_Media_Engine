@@ -8,10 +8,24 @@
 instagram:
   label: Instagram
   style: >
-    Punchy, scroll-stopping caption. Hook in the first line (visible before
-    "more"). Conversational, a little emoji. End with one clear call-to-action
-    (comment / save / share). 3-5 tightly relevant hashtags, no hashtag soup.
-  format: ""     # <- paste your Instagram image-post format here
+    Short, punchy market-alert caption. A little emoji. Not a long post.
+  format: |
+    Keep it SHORT — just a few lines. Follow this structure:
+
+    🚨 [Punchy headline ending with "!"]
+    [1-2 concise sentences: state the news, add a "Plan your trades in advance"
+    style line, and credit the brand "The Market Tales".]
+
+    (Hashtags are added separately — ALWAYS include #TheMarketTales among them.)
+  # Fixed account tags appended verbatim to the caption (never model-generated).
+  mentions:
+    - "@nseindia"
+    - "@bseindia"
+    - "@moneycontrolcom"
+    - "@cnbctv18india"
+    - "@etmarkets"
+    - "@livemint"
+    - "@business_today"
   caption_max_chars: 2200
   hashtags_min: 3
   hashtags_max: 5
