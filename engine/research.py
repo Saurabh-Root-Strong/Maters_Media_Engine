@@ -12,9 +12,15 @@ over the gathered text. Keeps each call simple and debuggable.
 
 from __future__ import annotations
 
+import os
+
+import yaml
+
 from . import llm
 
-_GATHER_SYSTEM = (
+_SOURCES_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "sources.yaml")
+
+_GATHER_BASE = (
     "You are an investigative news researcher. Given a topic, search the web for "
     "the most recent and most discussed reporting (prefer the last 24-72 hours). "
     "Find the REAL, SPECIFIC story — not a vague summary.\n"
@@ -27,6 +33,26 @@ _GATHER_SYSTEM = (
     "leading with, the words/phrases/hashtags recurring across coverage, and the "
     "sentiment. List every source URL. Do not write social posts yet."
 )
+
+
+def _sources_block() -> str:
+    try:
+        with open(_SOURCES_PATH, encoding="utf-8") as f:
+            sources = (yaml.safe_load(f) or {}).get("sources", [])
+    except OSError:
+        return ""
+    if not sources:
+        return ""
+    lines = "\n".join(f"- {s['name']}: {s.get('hint', '')}" for s in sources)
+    return (
+        "\n\nPRIORITISE these sources — run a targeted search on each (e.g. "
+        "'<topic> site:moneycontrol.com'), and cross-check the story across at "
+        "least THREE of them before trusting a claim:\n" + lines
+    )
+
+
+def _gather_system() -> str:
+    return _GATHER_BASE + _sources_block()
 
 _BRIEF_SCHEMA = {
     "type": "object",
@@ -63,7 +89,7 @@ _DISTILL_SYSTEM = (
 
 def gather(topic: str, use_search: bool | None = None) -> str:
     return llm.run_with_web_search(
-        _GATHER_SYSTEM,
+        _gather_system(),
         f"Topic: {topic}\n\nResearch what is trending about this now.",
         use_search=use_search,
     )
