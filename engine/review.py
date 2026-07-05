@@ -26,6 +26,24 @@ def _worst(*verdicts: str) -> str:
     return max(verdicts, key=lambda v: _ORDER.get(v, 1))
 
 
+def _is_wide(o: int) -> bool:
+    # Emoji / pictographic ranges Twitter counts as 2 chars.
+    return (
+        0x1F000 <= o <= 0x1FFFF
+        or 0x2600 <= o <= 0x27BF
+        or 0x2B00 <= o <= 0x2BFF
+        or 0x2190 <= o <= 0x21FF
+        or o in (0x2049, 0x203C, 0x2122, 0x2139)
+    )
+
+
+def char_count(caption: str, spec: dict) -> int:
+    """Twitter counts emoji as 2 chars — weight them when the platform flags it."""
+    if spec.get("count_emoji_double"):
+        return sum(2 if _is_wide(ord(c)) else 1 for c in caption)
+    return len(caption)
+
+
 # --- layer 1: deterministic limits -------------------------------------------
 
 def validate(drafts: dict, platforms: dict | None = None) -> dict:
@@ -36,13 +54,14 @@ def validate(drafts: dict, platforms: dict | None = None) -> dict:
         spec = platforms.get(key, {})
         issues: list[dict] = []
         caption = draft.get("caption", "") or ""
-        n = len(caption)
+        n = char_count(caption, spec)
 
         if not caption.strip():
             issues.append({"level": "hard", "msg": "caption is empty"})
         cap_max = spec.get("caption_max_chars")
         if cap_max and n > cap_max:
-            issues.append({"level": "hard", "msg": f"caption {n} chars > limit {cap_max}"})
+            weighted = " (emoji-weighted)" if spec.get("count_emoji_double") else ""
+            issues.append({"level": "hard", "msg": f"caption {n} chars{weighted} > limit {cap_max}"})
         cap_min = spec.get("caption_min_chars")
         if cap_min and n < cap_min:
             issues.append({"level": "soft", "msg": f"caption {n} chars < target {cap_min}"})

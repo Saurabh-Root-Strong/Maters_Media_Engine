@@ -53,7 +53,11 @@ twitter:
 
     Concrete, specific, analytical. Only verified facts from the brief — if the
     brief lacks specific numbers/companies, stay accurate and don't invent them.
+
+    HARD LIMIT: fit within 280 characters for a standard (free) X account, and
+    count each emoji as 2 characters. Aim for ~260 to be safe.
   caption_max_chars: 280
+  count_emoji_double: true   # X counts emoji as ~2 chars — weight the limit check
   hashtags_min: 0
   hashtags_max: 3
   needs_image: false
