@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Media-Engine</title>
+<style>
+  :root {
+    --bg:#0e1117; --panel:#161b22; --panel2:#1c2230; --line:#2a3140;
+    --ink:#e6edf3; --dim:#8b98a9; --accent:#c8962e;
+    --ok:#2ea043; --warn:#d29922; --bad:#da3633;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+  header { padding:22px 28px; border-bottom:1px solid var(--line);
+    display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
+  header h1 { margin:0; font-size:19px; letter-spacing:.3px; }
+  header .sub { color:var(--dim); font-size:13px; }
+  .mode { margin-left:auto; font-size:12px; color:var(--dim); }
+  .mode b { color:var(--accent); }
+  main { max-width:1100px; margin:0 auto; padding:24px 28px 60px; }
+  .bar { display:flex; gap:10px; margin-bottom:14px; }
+  .bar input.topic { flex:1; padding:12px 14px; background:var(--panel); color:var(--ink);
+    border:1px solid var(--line); border-radius:9px; font-size:15px; }
+  .bar button { padding:12px 22px; background:var(--accent); color:#111; border:none;
+    border-radius:9px; font-weight:600; cursor:pointer; font-size:15px; }
+  .bar button:disabled { opacity:.5; cursor:default; }
+  .controls { display:flex; gap:22px; flex-wrap:wrap; align-items:center;
+    margin-bottom:22px; padding:12px 16px; background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; font-size:14px; }
+  .controls .group { display:flex; gap:12px; align-items:center; }
+  .controls label { color:var(--dim); }
+  .controls .chk { color:var(--ink); display:inline-flex; gap:6px; align-items:center; cursor:pointer; }
+  .controls input[type=datetime-local], .controls select {
+    background:var(--panel2); color:var(--ink); border:1px solid var(--line);
+    border-radius:7px; padding:7px 9px; font-size:14px; }
+  .banner { padding:12px 16px; border-radius:9px; margin-bottom:18px; display:none; }
+  .banner.err { background:#2d1417; border:1px solid var(--bad); color:#ffb3b0; }
+  .spinner { display:none; color:var(--dim); margin:40px 0; text-align:center; }
+  .meta { background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:16px 18px; margin-bottom:20px; }
+  .meta h2 { margin:0 0 4px; font-size:13px; text-transform:uppercase;
+    letter-spacing:.6px; color:var(--dim); }
+  .chips { margin-top:8px; }
+  .chip { display:inline-block; background:var(--panel2); border:1px solid var(--line);
+    padding:2px 9px; border-radius:20px; font-size:12px; margin:3px 4px 0 0; color:var(--dim); }
+  .verdict { font-weight:700; }
+  .v-PASS{color:var(--ok);} .v-REVISE{color:var(--warn);} .v-HOLD{color:var(--bad);}
+  .flag { color:var(--bad); font-size:13px; margin-top:6px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:16px; display:flex; flex-direction:column; }
+  .card h3 { margin:0 0 10px; font-size:14px; display:flex; align-items:center; gap:8px; }
+  .badge { font-size:11px; padding:2px 8px; border-radius:6px; border:1px solid var(--line); }
+  .b-ready{color:var(--ok);border-color:var(--ok);}
+  .b-confirm{color:var(--warn);border-color:var(--warn);}
+  .b-blocked{color:var(--bad);border-color:var(--bad);}
+  .card img { width:100%; border-radius:8px; margin-bottom:10px; border:1px solid var(--line); }
+  .noimg { background:var(--panel2); border:1px dashed var(--line); border-radius:8px;
+    padding:24px; text-align:center; color:var(--dim); margin-bottom:10px; font-size:13px; }
+  .caption { white-space:pre-wrap; font-size:14px; flex:1; }
+  .tags { color:var(--accent); font-size:13px; margin-top:8px; }
+  .count { color:var(--dim); font-size:12px; margin-top:6px; }
+  .issues { color:var(--warn); font-size:12px; margin-top:8px; }
+  .postbtn { margin-top:12px; padding:10px; border:none; border-radius:8px;
+    font-weight:600; cursor:pointer; font-size:14px; }
+  .pb-ready{background:var(--ok);color:#fff;}
+  .pb-confirm{background:var(--warn);color:#111;}
+  .pb-blocked{background:#3a1d1f;color:#ff9a97;cursor:default;}
+  .result { margin-top:10px; font-size:13px; padding:10px; border-radius:8px;
+    background:var(--panel2); border:1px solid var(--line); display:none; }
+  .result pre { white-space:pre-wrap; word-break:break-word; margin:6px 0 0; color:var(--dim);
+    font-size:12px; }
+  .sched { margin-top:26px; }
+  .sched h2 { font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--dim); }
+  .job { display:flex; align-items:center; gap:12px; padding:10px 14px; background:var(--panel);
+    border:1px solid var(--line); border-radius:9px; margin-top:8px; font-size:14px; flex-wrap:wrap; }
+  .job .when { color:var(--accent); }
+  .job .st { font-size:12px; padding:2px 8px; border-radius:6px; border:1px solid var(--line); color:var(--dim); }
+  .job button { margin-left:auto; background:transparent; border:1px solid var(--line);
+    color:var(--dim); border-radius:7px; padding:5px 10px; cursor:pointer; font-size:12px; }
+  a { color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Media-Engine</h1>
+  <span class="sub">topic &rarr; auto-research &rarr; posts &rarr; review &rarr; publish</span>
+  <span class="mode" id="mode"></span>
+</header>
+<main>
+  <div class="bar">
+    <input class="topic" id="topic" placeholder='e.g. "Iran-Iraq war"' autofocus>
+    <button id="go">Generate</button>
+  </div>
+
+  <div class="controls">
+    <div class="group">
+      <label>Platforms</label>
+      <label class="chk"><input type="checkbox" class="plat" value="twitter" checked> Twitter/X</label>
+      <label class="chk"><input type="checkbox" class="plat" value="instagram" checked> Instagram</label>
+      <label class="chk"><input type="checkbox" class="plat" value="linkedin" checked> LinkedIn</label>
+    </div>
+    <div class="group">
+      <label>When</label>
+      <select id="when-mode">
+        <option value="now">Post now</option>
+        <option value="schedule">Schedule&hellip;</option>
+      </select>
+      <input type="datetime-local" id="when-time" style="display:none">
+    </div>
+  </div>
+
+  <div class="banner err" id="err"></div>
+  <div class="spinner" id="spin">Researching, drafting, rendering&hellip; (~30-60s)</div>
+  <div id="out"></div>
+
+  <div class="sched" id="sched" style="display:none">
+    <h2>Scheduled posts <span style="color:var(--dim);font-weight:400">(fire while this app is running)</span></h2>
+    <div id="jobs"></div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const LABEL = {twitter:"Twitter / X", instagram:"Instagram", linkedin:"LinkedIn"};
+let RUN = null, MODE = {live:false};
+
+async function api(path, body) {
+  const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(body||{})});
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || ("HTTP "+r.status));
+  return data;
+}
+function esc(s){ return (s||"").replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+function selectedPlatforms(){ return [...document.querySelectorAll(".plat:checked")].map(c=>c.value); }
+function scheduleSpec(){
+  if ($("when-mode").value !== "schedule") return {mode:"now"};
+  const v = $("when-time").value;
+  if (!v) return {mode:"schedule", missing:true};
+  return {mode:"schedule", epoch: new Date(v).getTime()/1000, label: v.replace("T"," ")};
+}
+$("when-mode").onchange = () => {
+  $("when-time").style.display = $("when-mode").value==="schedule" ? "inline-block" : "none";
+};
+
+async function generate() {
+  const topic = $("topic").value.trim();
+  const plats = selectedPlatforms();
+  if (!topic) return;
+  if (!plats.length){ showErr("Pick at least one platform."); return; }
+  $("err").style.display="none"; $("out").innerHTML="";
+  $("go").disabled=true; $("spin").style.display="block";
+  try {
+    const d = await api("/api/generate", {topic, platforms:plats});
+    RUN = d.run_id; render(d);
+  } catch(e) { showErr(e.message); }
+  finally { $("go").disabled=false; $("spin").style.display="none"; }
+}
+function showErr(m){ $("err").textContent=m; $("err").style.display="block"; }
+
+function render(d) {
+  MODE = d.mode;
+  $("mode").innerHTML = `auto-publish <b>${d.mode.auto?"ON":"off"}</b> · mode <b>${d.mode.live?"LIVE":"dry-run"}</b>`;
+  const rec = d.review.recommendation;
+  let html = `<div class="meta">
+    <h2>Brief</h2><div>${esc(d.brief.headline_summary)}</div>
+    <div class="chips"><span class="chip">sentiment: ${esc(d.brief.sentiment)}</span>`
+    + d.brief.trending_keywords.map(k=>`<span class="chip">${esc(k)}</span>`).join("") + `</div>`
+    + (d.brief.sensitivity_flags.length
+        ? `<div class="flag">⚠ sensitivity: ${d.brief.sensitivity_flags.map(esc).join(", ")}</div>`:"")
+    + `<h2 style="margin-top:14px">Angle — ${esc(d.angle.angle_type)}</h2><div>${esc(d.angle.angle)}</div>
+       <div style="color:var(--dim);margin-top:4px">Key message: ${esc(d.angle.key_message)}</div>
+       <h2 style="margin-top:14px">Review</h2>
+       <div>Verdict: <span class="verdict v-${rec}">${rec}</span></div>
+       <div style="color:var(--dim)">${esc(d.review.summary)}</div></div><div class="grid">`;
+
+  for (const key of ["instagram","twitter","linkedin"]) {
+    const draft = d.drafts[key]; if (!draft) continue;
+    const p = d.platforms[key] || {state:"ready"};
+    const tags = (draft.hashtags||[]).map(h=>"#"+h.replace(/^#/,"")).join(" ");
+    let img = "";
+    if (key==="instagram")
+      img = d.image_url ? `<img src="${d.image_url}" alt="${esc(draft.alt_text||"")}">`
+        : `<div class="noimg">image not rendered${d.image_error?": "+esc(d.image_error):""}</div>`;
+    html += `<div class="card">
+      <h3>${LABEL[key]} <span class="badge b-${p.state}">${p.verdict}</span></h3>
+      ${img}<div class="caption">${esc(draft.caption)}</div>
+      ${tags?`<div class="tags">${esc(tags)}</div>`:""}
+      <div class="count">${(draft.caption||"").length} chars${p.creds?"":" · no credentials"}</div>
+      ${p.issues&&p.issues.length?`<div class="issues">${p.issues.map(esc).join("<br>")}</div>`:""}
+      ${postButton(key, p)}
+      <div class="result" id="res-${key}"></div></div>`;
+  }
+  html += `</div>`;
+  $("out").innerHTML = html;
+  for (const key of ["instagram","twitter","linkedin"]) {
+    const btn = $("btn-"+key); if (btn) btn.onclick = ()=>act(key, d.platforms[key]);
+  }
+  refreshJobs();
+}
+
+function postButton(key, p) {
+  if (p.state==="blocked") return `<button class="postbtn pb-blocked" disabled>Blocked by review</button>`;
+  const sched = $("when-mode").value==="schedule";
+  const dry = !MODE.live ? " (dry-run)" : "";
+  const verb = sched ? "Schedule" : "Post";
+  const cls = p.state==="confirm" ? "pb-confirm" : "pb-ready";
+  const label = p.state==="confirm" ? `Review &amp; ${verb}${dry}` : `${verb}${dry}`;
+  return `<button class="postbtn ${cls}" id="btn-${key}">${label}</button>`;
+}
+
+async function act(key, p) {
+  let confirmFlag = false;
+  if (p.state==="confirm") {
+    if (!window.confirm("This topic/draft needs human sign-off (sensitive or HOLD). Continue?")) return;
+    confirmFlag = true;
+  }
+  const spec = scheduleSpec();
+  const box = $("res-"+key); box.style.display="block"; box.textContent="Working…";
+  try {
+    if (spec.mode==="schedule") {
+      if (spec.missing){ box.innerHTML=`<span style="color:var(--bad)">Pick a schedule time first.</span>`; return; }
+      const r = await api("/api/schedule", {run_id:RUN, platform:key, confirm:confirmFlag,
+        when_epoch:spec.epoch, when_label:spec.label});
+      box.innerHTML = r.status==="scheduled"
+        ? `<span style="color:var(--accent)">⏱ scheduled for ${esc(r.job.when_label)}</span>`
+        : renderResult(r);
+      refreshJobs();
+    } else {
+      const r = await api("/api/publish", {run_id:RUN, platform:key, confirm:confirmFlag});
+      box.innerHTML = renderResult(r);
+    }
+  } catch(e) { box.innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`; }
+}
+
+function renderResult(r) {
+  if (r.status==="posted") return `<span style="color:var(--ok)">✓ Posted</span> ${r.url?`<a href="${r.url}">${r.url}</a>`:""}`;
+  if (r.status==="dry-run") {
+    const req = r.request||{}; const url = req.url || (req.steps&&req.steps[0]&&req.steps[0].url) || "?";
+    return `<span style="color:var(--accent)">dry-run — would ${req.method} ${esc(url)}</span>`
+      + `<pre>${esc(JSON.stringify(req.body||req.steps||{},null,1)).slice(0,400)}</pre>`;
+  }
+  if (r.status==="skipped") return `<span style="color:var(--dim)">skipped — ${esc(r.reason||"")}${r.missing?": "+r.missing.join(", "):""}</span>`;
+  if (r.status==="blocked"||r.status==="needs_confirm") return `<span style="color:var(--bad)">${esc(r.reason||r.status)}</span>`;
+  if (r.status==="error") return `<span style="color:var(--bad)">error — ${esc(r.error||"")}</span>`;
+  return `<span style="color:var(--dim)">${esc(JSON.stringify(r))}</span>`;
+}
+
+async function refreshJobs() {
+  try {
+    const d = await (await fetch("/api/scheduled")).json();
+    const jobs = d.jobs||[];
+    $("sched").style.display = jobs.length ? "block" : "none";
+    $("jobs").innerHTML = jobs.map(j=>`<div class="job">
+      <b>${LABEL[j.platform]||j.platform}</b>
+      <span>${esc(j.topic)}</span>
+      <span class="when">⏱ ${esc(j.when_label)}</span>
+      <span class="st">${j.live?"live":"dry-run"} · ${j.status}${j.detail?" — "+esc(j.detail):""}</span>
+      ${j.status==="pending"?`<button onclick="cancelJob('${j.id}')">Cancel</button>`:""}
+    </div>`).join("");
+  } catch(e) {}
+}
+async function cancelJob(id){ await api("/api/scheduled/cancel", {id}); refreshJobs(); }
+
+$("go").onclick = generate;
+$("topic").addEventListener("keydown", e=>{ if(e.key==="Enter") generate(); });
+setInterval(refreshJobs, 8000);
+refreshJobs();
+</script>
+</body>
+</html>

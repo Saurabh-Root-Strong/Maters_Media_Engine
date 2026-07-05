@@ -1,0 +1,38 @@
+# Per-platform style + hard limits. Drafters read this so rules live in config,
+# not code. Edit tone/limits here without touching Python.
+
+instagram:
+  label: Instagram
+  style: >
+    Punchy, scroll-stopping caption. Hook in the first line (visible before
+    "more"). Conversational, a little emoji. End with one clear call-to-action
+    (comment / save / share). 3-5 tightly relevant hashtags, no hashtag soup.
+  caption_max_chars: 2200
+  hashtags_min: 3
+  hashtags_max: 5
+  needs_image: true
+
+twitter:
+  label: Twitter/X
+  style: >
+    Single short burst. One sharp hook line that stands alone. No thread.
+    Punchy, opinionated, quotable. At most 2 hashtags. Fit comfortably under
+    the limit — do not pad to fill it.
+  caption_max_chars: 280
+  hashtags_min: 0
+  hashtags_max: 2
+  needs_image: false
+
+linkedin:
+  label: LinkedIn
+  style: >
+    Storytelling. Open with a hook line, then a short narrative arc
+    (situation -> tension -> insight), then a takeaway the reader can use.
+    Professional but human — no corporate cringe, no "I am humbled to
+    announce". Short paragraphs, whitespace between them. End with a
+    reflective question or takeaway. 3-5 hashtags at the very end.
+  caption_max_chars: 2000
+  caption_min_chars: 1000
+  hashtags_min: 3
+  hashtags_max: 5
+  needs_image: false

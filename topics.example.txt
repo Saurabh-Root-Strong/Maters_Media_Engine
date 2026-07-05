@@ -1,0 +1,5 @@
+# One topic per line. Lines starting with # are ignored.
+# Run: python cli.py --queue topics.example.txt
+Reserve Bank of India rate decision
+India women's cricket team final
+new AI chip launch
