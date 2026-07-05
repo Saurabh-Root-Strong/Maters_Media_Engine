@@ -83,8 +83,9 @@ def index():
 
 @app.get("/api/config")
 def api_config():
+    from engine import imagegen
     c = policy.Config.from_env()
-    return jsonify({"web_search": llm.web_search_enabled(),
+    return jsonify({"web_search": llm.web_search_enabled(), "image_backend": imagegen.backend(),
                     "live": c.live, "auto": c.auto_publish})
 
 
@@ -107,9 +108,11 @@ def api_generate():
     if not llm.has_api_key():
         return jsonify({"error": f"{llm.key_var()} not set — add it to .env and restart."}), 400
 
-    web_search = body.get("web_search")  # None -> env default; bool -> override
+    web_search = body.get("web_search")     # None -> env default; bool -> override
+    image_backend = body.get("image_backend")  # None / "template" / "openai"
     try:
-        result = orchestrator.run(topic, platforms_selected=selected, use_search=web_search)
+        result = orchestrator.run(topic, platforms_selected=selected,
+                                  use_search=web_search, image_backend=image_backend)
     except Exception as exc:  # noqa: BLE001
         return jsonify({"error": f"Generation failed: {exc}"}), 500
 
@@ -137,6 +140,7 @@ def api_generate():
         "drafts": result["drafts"],
         "image_url": image_url,
         "image_error": result.get("image_error"),
+        "image_platforms": result.get("image_platforms", []),
         "review": {
             "recommendation": result["review"]["recommendation"],
             "summary": result["review"]["critique_summary"],

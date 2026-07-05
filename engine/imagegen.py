@@ -12,6 +12,7 @@ generate()       does both and writes the PNG.
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 
@@ -21,6 +22,15 @@ from . import llm
 
 SIZE = 1080
 MARGIN = 90
+
+# template = Pillow gradient card (free, default). openai = generative poster
+# (dramatic composite style, costs ~$0.04-0.17/image).
+_BACKEND = os.environ.get("MEDIA_ENGINE_IMAGE_BACKEND", "template").strip().lower()
+_IMAGE_QUALITY = os.environ.get("MEDIA_ENGINE_IMAGE_QUALITY", "medium").strip().lower()
+
+
+def backend() -> str:
+    return _BACKEND
 
 _SPEC_SYSTEM = (
     "You design a single square Instagram news card. Given the post draft, "
@@ -178,8 +188,48 @@ def render(spec: dict, out_path: str) -> str:
     return out_path
 
 
-def generate(ig_draft: dict, angle: dict, out_path: str) -> dict:
-    """Design + render. Returns {path, spec}."""
-    spec = design_spec(ig_draft, angle)
-    render(spec, out_path)
-    return {"path": out_path, "spec": spec}
+# --- generative backend (OpenAI images) --------------------------------------
+
+def _poster_prompt(spec: dict, angle: dict) -> str:
+    return (
+        "Dramatic, high-impact editorial exposé poster, square 1:1 composition. "
+        f'Bold distressed condensed UPPERCASE headline reading exactly "{spec["headline"]}" '
+        "in white and blood-red grunge lettering, very high contrast, cinematic. "
+        f'A smaller supporting line: "{spec["subhead"]}". '
+        "Dark moody layered background suited to the topic — for finance/markets use a "
+        "crashing red stock chart, a faint city skyline or stock-exchange building, torn "
+        "newspaper clippings and a red warning stamp; adapt the imagery to the subject "
+        f"({angle.get('angle', '')}). Serious, attention-grabbing news tone. "
+        "Spell all text exactly as given — no gibberish text, no watermark, no logos."
+    )
+
+
+def _openai_image(spec: dict, angle: dict, out_path: str) -> str:
+    from openai import OpenAI
+
+    client = OpenAI(max_retries=2, timeout=180.0)
+    result = client.images.generate(
+        model="gpt-image-1",
+        prompt=_poster_prompt(spec, angle),
+        size="1024x1024",
+        quality=_IMAGE_QUALITY,
+    )
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, "wb") as f:
+        f.write(base64.b64decode(result.data[0].b64_json))
+    return out_path
+
+
+def generate(draft: dict, angle: dict, out_path: str, use_backend: str | None = None) -> dict:
+    """Design the card spec, then render via the chosen backend.
+
+    use_backend: None -> env default; "template" (free Pillow card) or "openai"
+    (generative poster) overrides it. Returns {path, spec, backend}.
+    """
+    b = (use_backend or _BACKEND).strip().lower()
+    spec = design_spec(draft, angle)
+    if b == "openai":
+        _openai_image(spec, angle, out_path)
+    else:
+        render(spec, out_path)
+    return {"path": out_path, "spec": spec, "backend": b}

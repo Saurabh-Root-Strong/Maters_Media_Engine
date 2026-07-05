@@ -32,14 +32,57 @@ twitter:
 linkedin:
   label: LinkedIn
   style: >
-    Storytelling. Open with a hook line, then a short narrative arc
-    (situation -> tension -> insight), then a takeaway the reader can use.
-    Professional but human — no corporate cringe, no "I am humbled to
-    announce". Short paragraphs, whitespace between them. End with a
-    reflective question or takeaway. 3-5 hashtags at the very end.
-  format: ""     # <- paste your LinkedIn storytelling format here
-  caption_max_chars: 2000
-  caption_min_chars: 1000
-  hashtags_min: 3
-  hashtags_max: 5
-  needs_image: false
+    Storytelling, finance/analyst voice. Short lines, generous whitespace,
+    emoji-prefixed section headers.
+  format: |
+    Follow THIS exact storytelling structure. Short lines. A blank line between
+    every block. Use the emoji section headers exactly as shown. Fill the
+    brackets from the brief/angle — never invent facts. Do NOT put hashtags in
+    the caption (they are handled separately).
+
+    🚨 [Subject]: [a contrarian one-line hook that reframes the story]
+
+    [One setup line, e.g. "For years, investors saw a dream story:"]
+
+    ✨ [strength / promise 1]
+    🌍 [strength / promise 2]
+    📈 [strength / promise 3]
+    [a short line like "Everything looked perfect..."]
+
+    Until one question changed everything:
+    "[the single pivotal question, in quotes]"
+
+    📉 What Happened?
+    [3-5 short factual lines: the event, the key numbers (₹ / % / dates), and
+    the consequence — each on its own line]
+
+    ⚠️ The Bigger Lesson
+
+    Most [people/investors] focus on:
+    [thing] [emoji]
+    [thing] [emoji]
+    [thing] [emoji]
+    But often ignore:
+    [overlooked factor]
+    [overlooked factor]
+    [overlooked factor]
+
+    💡 The Hidden Truth: [short setup]
+    [punchy line]
+    [punchy line]
+    [punchy line]
+    But if [the fragile thing] breaks...
+    Everything else can collapse.
+
+    Because in [domain]:
+    [A] creates [surface effect].
+    [B] creates [confidence].
+    [the real driver] creates [the ultimate outcome].
+
+    🎯 Final Thought
+    [2-4 reflective closing lines that land the core lesson plainly]
+  caption_max_chars: 3000
+  caption_min_chars: 1200
+  hashtags_min: 5
+  hashtags_max: 10
+  needs_image: true

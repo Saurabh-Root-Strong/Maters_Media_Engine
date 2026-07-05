@@ -115,6 +115,13 @@
         <input type="checkbox" id="websearch"> Live web search
       </label>
     </div>
+    <div class="group">
+      <label>Image</label>
+      <select id="imgbackend" title="Card = free Pillow graphic. Poster = generative dramatic poster (~$0.05).">
+        <option value="template">Card (free)</option>
+        <option value="openai">Poster ($)</option>
+      </select>
+    </div>
   </div>
 
   <div class="banner err" id="err"></div>
@@ -160,7 +167,8 @@ async function generate() {
   $("err").style.display="none"; $("out").innerHTML="";
   $("go").disabled=true; $("spin").style.display="block";
   try {
-    const d = await api("/api/generate", {topic, platforms:plats, web_search:$("websearch").checked});
+    const d = await api("/api/generate", {topic, platforms:plats,
+      web_search:$("websearch").checked, image_backend:$("imgbackend").value});
     RUN = d.run_id; render(d);
   } catch(e) { showErr(e.message); }
   finally { $("go").disabled=false; $("spin").style.display="none"; }
@@ -188,7 +196,7 @@ function render(d) {
     const p = d.platforms[key] || {state:"ready"};
     const tags = (draft.hashtags||[]).map(h=>"#"+h.replace(/^#/,"")).join(" ");
     let img = "";
-    if (key==="instagram")
+    if ((d.image_platforms||[]).includes(key))
       img = d.image_url ? `<img src="${d.image_url}" alt="${esc(draft.alt_text||"")}">`
         : `<div class="noimg">image not rendered${d.image_error?": "+esc(d.image_error):""}</div>`;
     html += `<div class="card">
@@ -275,6 +283,7 @@ async function loadConfig() {
   try {
     const c = await (await fetch("/api/config")).json();
     $("websearch").checked = !!c.web_search;
+    if (c.image_backend) $("imgbackend").value = c.image_backend;
   } catch(e) {}
 }
 

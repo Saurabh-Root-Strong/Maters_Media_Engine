@@ -21,7 +21,8 @@ def _slug(topic: str) -> str:
 
 
 def run(topic: str, platforms_selected: list[str] | None = None,
-        use_search: bool | None = None, on_progress=None) -> dict:
+        use_search: bool | None = None, image_backend: str | None = None,
+        on_progress=None) -> dict:
     def note(msg: str) -> None:
         if on_progress:
             on_progress(msg)
@@ -55,13 +56,19 @@ def run(topic: str, platforms_selected: list[str] | None = None,
         "review": gate,
     }
 
-    # Stage 4 — Instagram image. Fail-soft: a render error must not lose drafts.
-    if "instagram" in drafts:
-        note("Rendering the Instagram image...")
+    # Stage 4 — image for any selected platform that wants one (prefer Instagram
+    # for the spec). One shared image per run. Fail-soft: keep drafts regardless.
+    image_platforms = [k for k in drafts if platforms.get(k, {}).get("needs_image")]
+    if image_platforms:
+        primary = "instagram" if "instagram" in image_platforms else image_platforms[0]
+        note("Rendering the image...")
         out_path = os.path.join(_OUT_DIR, f"{_slug(topic)}.png")
         try:
-            result["image"] = imagegen.generate(drafts["instagram"], angle, out_path)
-        except Exception as exc:  # noqa: BLE001 — keep the drafts regardless
+            result["image"] = imagegen.generate(drafts[primary], angle, out_path,
+                                                 use_backend=image_backend)
+            result["image_platforms"] = image_platforms
+        except Exception as exc:  # noqa: BLE001
             result["image_error"] = str(exc)
+            result["image_platforms"] = image_platforms
 
     return result

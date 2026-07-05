@@ -30,7 +30,7 @@ def test_validate_empty_caption_is_hard():
 
 
 def test_linkedin_short_caption_is_soft_only():
-    v = validate({"linkedin": {"caption": "too short", "hashtags": ["a", "b", "c"]}})
+    v = validate({"linkedin": {"caption": "too short", "hashtags": ["a", "b", "c", "d", "e"]}})
     levels = {i["level"] for i in v["linkedin"]}
     assert "soft" in levels and "hard" not in levels
     assert hard_violations(v) == {}
