@@ -22,7 +22,7 @@ import time  # noqa: E402
 
 from flask import Flask, jsonify, render_template, request, send_from_directory  # noqa: E402
 
-from engine import llm, manifest, orchestrator, policy  # noqa: E402
+from engine import llm, manifest, memory, orchestrator, policy  # noqa: E402
 from engine.publishers import BY_KEY  # noqa: E402
 from engine.scheduler import scheduler  # noqa: E402
 
@@ -119,10 +119,11 @@ def api_generate():
     except Exception as exc:  # noqa: BLE001
         return jsonify({"error": f"Generation failed: {exc}"}), 500
 
+    memory.record_topic(topic)  # history: avoid repeats + inform trending
     run_id = uuid.uuid4().hex
     frozen = manifest.build(result, approved_by="dashboard")
     _RUNS[run_id] = {"frozen": frozen, "review": result["review"]}
-    while len(_RUNS) > 50:  # bound memory — drop the oldest run
+    while len(_RUNS) > 50:  # bound run store — drop the oldest run
         del _RUNS[next(iter(_RUNS))]
 
     image = result.get("image") or {}
@@ -168,6 +169,18 @@ def api_publish():
 
     live = policy.Config.from_env().live
     return jsonify(BY_KEY[platform].publish(run["frozen"], live=live)), 200
+
+
+@app.post("/api/trending")
+def api_trending():
+    if not llm.has_api_key():
+        return jsonify({"error": f"{llm.key_var()} not set."}), 400
+    web_search = (request.json or {}).get("web_search")
+    try:
+        from engine import trending
+        return jsonify({"topics": trending.suggest(6, use_search=web_search)})
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": f"Trending fetch failed: {exc}"}), 500
 
 
 @app.post("/api/schedule")

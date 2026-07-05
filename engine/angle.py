@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-from . import llm
+from . import llm, memory
 
 _SYSTEM = (
     "You are a content strategist. Given a research brief, pick the single most "
@@ -38,5 +38,6 @@ _SCHEMA = {
 
 def choose(brief: dict) -> dict:
     return llm.structured(
-        _SYSTEM, "Research brief:\n\n" + json.dumps(brief, indent=2), _SCHEMA
+        _SYSTEM + memory.brand_block(),
+        "Research brief:\n\n" + json.dumps(brief, indent=2), _SCHEMA,
     )

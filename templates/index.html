@@ -26,6 +26,12 @@
   .bar button { padding:12px 22px; background:var(--accent); color:#111; border:none;
     border-radius:9px; font-weight:600; cursor:pointer; font-size:15px; }
   .bar button:disabled { opacity:.5; cursor:default; }
+  #trend { background:var(--panel2); color:var(--accent); border:1px solid var(--line); }
+  .trendbox { margin-bottom:16px; display:flex; flex-direction:column; gap:8px; }
+  .trendchip { text-align:left; background:var(--panel); border:1px solid var(--line);
+    border-radius:9px; padding:10px 14px; cursor:pointer; color:var(--ink); }
+  .trendchip:hover { border-color:var(--accent); }
+  .trendchip .why { color:var(--dim); font-size:13px; margin-top:2px; }
   .controls { display:flex; gap:22px; flex-wrap:wrap; align-items:center;
     margin-bottom:22px; padding:12px 16px; background:var(--panel); border:1px solid var(--line);
     border-radius:10px; font-size:14px; }
@@ -93,8 +99,10 @@
 <main>
   <div class="bar">
     <input class="topic" id="topic" placeholder='e.g. "Iran-Iraq war"' autofocus>
+    <button id="trend" title="Suggest current trending topics from your sources">🔥 Trending</button>
     <button id="go">Generate</button>
   </div>
+  <div id="trendbox" class="trendbox" style="display:none"></div>
 
   <div class="controls">
     <div class="group">
@@ -303,6 +311,28 @@ async function loadConfig() {
   } catch(e) {}
 }
 
+async function loadTrending() {
+  const box = $("trendbox");
+  $("trend").disabled = true; $("trend").textContent = "🔎 Finding…";
+  box.style.display = "block"; box.innerHTML = '<span style="color:var(--dim)">Scanning your sources for what\'s trending…</span>';
+  try {
+    const d = await api("/api/trending", {web_search:$("websearch").checked});
+    box.innerHTML = "";
+    for (const t of (d.topics||[])) {
+      const el = document.createElement("div"); el.className = "trendchip";
+      el.innerHTML = `<b>${esc(t.topic)}</b><div class="why">${esc(t.why)}</div>`;
+      el.onclick = () => { $("topic").value = t.topic; box.style.display="none"; generate(); };
+      box.appendChild(el);
+    }
+    if (!box.children.length) box.innerHTML = '<span style="color:var(--dim)">No trending topics found.</span>';
+  } catch(e) {
+    box.innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`;
+  } finally {
+    $("trend").disabled = false; $("trend").textContent = "🔥 Trending";
+  }
+}
+
+$("trend").onclick = loadTrending;
 $("go").onclick = generate;
 $("topic").addEventListener("keydown", e=>{ if(e.key==="Enter") generate(); });
 setInterval(refreshJobs, 8000);

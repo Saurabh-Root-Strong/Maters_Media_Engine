@@ -13,7 +13,7 @@ import os
 
 import yaml
 
-from . import llm
+from . import llm, memory
 
 _CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "platforms.yaml")
 
@@ -123,6 +123,7 @@ def draft_all(brief: dict, angle: dict, selected: list[str] | None = None) -> di
         "platform below, each in its own native voice, all landing the same key "
         "message using only verified facts from the brief. Return one object with "
         f"a key per platform ({', '.join(platforms)}).\n\n" + rule_blocks
+        + memory.brand_block()
     )
     user = (
         "ANGLE:\n" + json.dumps(angle, indent=2)
