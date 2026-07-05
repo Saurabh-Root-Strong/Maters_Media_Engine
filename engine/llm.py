@@ -28,7 +28,7 @@ def _detect_provider() -> str:
 
 PROVIDER = _detect_provider()
 
-_OPENAI_MODEL = os.environ.get("MEDIA_ENGINE_OPENAI_MODEL", "gpt-5.4-mini")
+_OPENAI_MODEL = os.environ.get("MEDIA_ENGINE_OPENAI_MODEL", "gpt-4o-mini")
 _ANTHROPIC_MODEL = os.environ.get("MEDIA_ENGINE_MODEL", "claude-opus-4-8")
 _ANTHROPIC_EFFORT = os.environ.get("MEDIA_ENGINE_EFFORT", "high")
 
