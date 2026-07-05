@@ -210,15 +210,12 @@ def _poster_prompt(spec: dict, angle: dict) -> str:
     )
 
 
-def _openai_image(spec: dict, angle: dict, out_path: str) -> str:
+def _openai_image(prompt: str, out_path: str, size: str = "1024x1024") -> str:
     from openai import OpenAI
 
     client = OpenAI(max_retries=2, timeout=180.0)
     result = client.images.generate(
-        model="gpt-image-1",
-        prompt=_poster_prompt(spec, angle),
-        size="1024x1024",
-        quality=_IMAGE_QUALITY,
+        model="gpt-image-1", prompt=prompt, size=size, quality=_IMAGE_QUALITY,
     )
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "wb") as f:
@@ -226,16 +223,99 @@ def _openai_image(spec: dict, angle: dict, out_path: str) -> str:
     return out_path
 
 
-def generate(draft: dict, angle: dict, out_path: str, use_backend: str | None = None) -> dict:
-    """Design the card spec, then render via the chosen backend.
+# --- master poster templates (parsed from config/Image_prompts.txt) ----------
 
-    use_backend: None -> env default; "template" (free Pillow card) or "openai"
-    (generative poster) overrides it. Returns {path, spec, backend}.
+_TEMPLATES_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "Image_prompts.txt")
+
+# Metadata for each PROMPT block, in file order. trigger drives auto-selection.
+_TEMPLATE_META = [
+    ("market_holiday", "Stock Market Holiday / Market Update",
+     "exchange/market holiday, market closed, festival or national-holiday closure, big market update"),
+    ("geopolitical", "Breaking Geopolitical / Oil / Trade Route",
+     "geopolitics, crude oil, shipping routes/straits, war or trade-route tension affecting markets"),
+    ("corporate_fraud", "Corporate Fraud / Stock Crash / Investigation",
+     "company fraud, scam, accounting scandal, SEBI/regulator probe, stock crash or collapse"),
+    ("defence", "Indian Defence Sector / Defence Stocks",
+     "defence sector, defence stocks rally, military modernization, defence orders/exports/policy"),
+]
+
+
+def _load_templates() -> list[dict]:
+    try:
+        with open(_TEMPLATES_PATH, encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return []
+    import re
+    blocks = re.split(r"PROMPT\s+\d+\s+—", text)[1:]  # drop the preamble
+    out = []
+    for (tid, name, trigger), body in zip(_TEMPLATE_META, blocks):
+        out.append({"id": tid, "name": name, "trigger": trigger,
+                    "prompt": body.strip(), "aspect": "1024x1536"})  # portrait 2:3
+    return out
+
+
+def templates() -> list[dict]:
+    return [{"id": t["id"], "name": t["name"]} for t in _load_templates()]
+
+
+def _story_text(draft: dict, angle: dict, brief: dict | None) -> str:
+    parts = [f"ANGLE: {angle.get('angle', '')}",
+             f"KEY MESSAGE: {angle.get('key_message', '')}",
+             f"POST: {draft.get('caption', '')}"]
+    if brief:
+        parts.append("FACTS: " + " | ".join(brief.get("facts", [])[:6]))
+    return "\n".join(parts)
+
+
+def _classify(story: str, tmpls: list[dict]) -> str:
+    ids = [t["id"] for t in tmpls]
+    schema = {"type": "object",
+              "properties": {"template_id": {"type": "string", "enum": ids + ["generic"]}},
+              "required": ["template_id"], "additionalProperties": False}
+    system = ("Pick the ONE poster template whose scenario best fits the story, "
+              "or 'generic' if none clearly fit.")
+    user = story + "\n\nTEMPLATES:\n" + "\n".join(f"{t['id']}: {t['trigger']}" for t in tmpls)
+    return llm.structured(system, user, schema, max_tokens=200)["template_id"]
+
+
+def _fill(template: dict, story: str) -> str:
+    system = (
+        "You are preparing a final AI image-generation prompt from a template. "
+        "Replace every [PLACEHOLDER] with specific, accurate content drawn from "
+        "the story. Keep ALL style, layout, lighting and negative instructions "
+        "intact. Use only facts from the story — if a value is unknown, pick a "
+        "sensible accurate one or drop that bracket gracefully; never invent "
+        "numbers, logos, or claims. Output ONLY the final prompt text."
+    )
+    user = "STORY:\n" + story + "\n\nTEMPLATE:\n" + template["prompt"]
+    return llm.complete(system, user, max_tokens=1600)
+
+
+def generate(draft: dict, angle: dict, out_path: str, use_backend: str | None = None,
+             brief: dict | None = None, template_id: str | None = None) -> dict:
+    """Render via the chosen backend.
+
+    template = free Pillow card. openai = generative poster: auto-selects one of
+    the master templates (or a chosen template_id, or 'generic' adaptive), fills
+    it from the story, and renders it. Returns {path, backend, ...}.
     """
     b = (use_backend or _BACKEND).strip().lower()
-    spec = design_spec(draft, angle)
-    if b == "openai":
-        _openai_image(spec, angle, out_path)
-    else:
+    if b != "openai":
+        spec = design_spec(draft, angle)
         render(spec, out_path)
-    return {"path": out_path, "spec": spec, "backend": b}
+        return {"path": out_path, "spec": spec, "backend": "template"}
+
+    tmpls = _load_templates()
+    story = _story_text(draft, angle, brief)
+    tid = template_id if (template_id and template_id != "auto") else _classify(story, tmpls)
+    tpl = next((t for t in tmpls if t["id"] == tid), None)
+    if tpl:
+        prompt = _fill(tpl, story)
+        size = tpl.get("aspect", "1024x1024")
+    else:  # generic adaptive fallback
+        spec = design_spec(draft, angle)
+        prompt = _poster_prompt(spec, angle)
+        size, tid = "1024x1024", "generic"
+    _openai_image(prompt, out_path, size)
+    return {"path": out_path, "backend": "openai", "template": tid, "prompt": prompt}

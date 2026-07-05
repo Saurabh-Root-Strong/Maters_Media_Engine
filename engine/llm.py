@@ -157,3 +157,19 @@ def structured(system: str, user: str, schema: dict, max_tokens: int = 4000) -> 
     if PROVIDER == "openai":
         return _openai_structured(system, user, schema)
     return _anthropic_structured(system, user, schema, max_tokens)
+
+
+def complete(system: str, user: str, max_tokens: int = 1500) -> str:
+    """Plain text completion (no tools, no schema)."""
+    if PROVIDER == "openai":
+        r = _openai().chat.completions.create(
+            model=_OPENAI_MODEL,
+            messages=[{"role": "system", "content": system},
+                      {"role": "user", "content": user}],
+        )
+        return (r.choices[0].message.content or "").strip()
+    r = _anthropic().messages.create(
+        model=_ANTHROPIC_MODEL, max_tokens=max_tokens, system=system,
+        messages=[{"role": "user", "content": user}],
+    )
+    return _anthropic_text(r)

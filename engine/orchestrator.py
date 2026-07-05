@@ -22,7 +22,7 @@ def _slug(topic: str) -> str:
 
 def run(topic: str, platforms_selected: list[str] | None = None,
         use_search: bool | None = None, image_backend: str | None = None,
-        on_progress=None) -> dict:
+        image_template: str | None = None, on_progress=None) -> dict:
     def note(msg: str) -> None:
         if on_progress:
             on_progress(msg)
@@ -65,7 +65,8 @@ def run(topic: str, platforms_selected: list[str] | None = None,
         out_path = os.path.join(_OUT_DIR, f"{_slug(topic)}.png")
         try:
             result["image"] = imagegen.generate(drafts[primary], angle, out_path,
-                                                 use_backend=image_backend)
+                                                 use_backend=image_backend, brief=brief,
+                                                 template_id=image_template)
             result["image_platforms"] = image_platforms
         except Exception as exc:  # noqa: BLE001
             result["image_error"] = str(exc)

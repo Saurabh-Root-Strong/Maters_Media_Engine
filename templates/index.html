@@ -122,6 +122,9 @@
         <option value="template">Card (free)</option>
         <option value="openai">Poster ($)</option>
       </select>
+      <select id="imgtemplate" title="Poster style — Auto picks the best-fit master template for the topic.">
+        <option value="auto">Auto style</option>
+      </select>
     </div>
   </div>
 
@@ -174,7 +177,7 @@ async function generate() {
   $("go").disabled=true; $("spin").style.display="block";
   try {
     const d = await api("/api/generate", {topic, platforms:plats,
-      web_search:ws, image_backend:$("imgbackend").value});
+      web_search:ws, image_backend:$("imgbackend").value, image_template:$("imgtemplate").value});
     RUN = d.run_id; render(d);
     if (!ws) $("searchnote").style.display="block";
   } catch(e) { showErr(e.message); }
@@ -291,6 +294,12 @@ async function loadConfig() {
     const c = await (await fetch("/api/config")).json();
     $("websearch").checked = !!c.web_search;
     if (c.image_backend) $("imgbackend").value = c.image_backend;
+    if (c.image_templates && c.image_templates.length) {
+      const sel = $("imgtemplate");
+      for (const t of c.image_templates) {
+        const o = document.createElement("option"); o.value = t.id; o.textContent = t.name; sel.appendChild(o);
+      }
+    }
   } catch(e) {}
 }
 

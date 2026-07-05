@@ -1,0 +1,533 @@
+MASTER IMAGE PROMPTS — 4 FINANCIAL NEWS POSTER TEMPLATES
+
+============================================================ PROMPT 1 —
+STOCK MARKET HOLIDAY / IMPORTANT MARKET UPDATE
+============================================================
+
+Create a premium vertical financial news poster for an Indian stock
+market social media page.
+
+FORMAT: Vertical portrait poster, 2:3 aspect ratio,
+ultra-high-resolution, cinematic financial editorial design, optimized
+for Instagram and LinkedIn.
+
+OVERALL STYLE: Premium Indian financial news media aesthetic. Dark
+black, charcoal, metallic gold, warm amber and selective white color
+palette. High contrast cinematic lighting. Professional, trustworthy and
+authoritative. The design should feel like a combination of a premium
+financial magazine cover, institutional market research publication and
+cinematic stock market poster.
+
+LAYOUT:
+
+TOP HEADER: Create a clean premium masthead area.
+
+Place a minimal candlestick-chart inspired brand icon on the upper left.
+
+Brand name: “[BRAND NAME]”
+
+Tagline below: “[BRAND TAGLINE]”
+
+Use elegant condensed sans-serif typography. Keep the header
+sophisticated and uncluttered.
+
+MAIN LEFT HEADLINE: Use approximately 40% of the upper composition for a
+very large stacked headline.
+
+Headline: “[MAIN HEADLINE LINE 1] [MAIN HEADLINE LINE 2] [MAIN HEADLINE
+LINE 3]”
+
+Example visual hierarchy: STOCK MARKET HOLIDAY
+
+Use bold condensed uppercase typography. First two lines in textured
+off-white. Most important keyword in strong financial gold/yellow.
+
+RIGHT-SIDE HERO VISUAL: Create a photorealistic cinematic representation
+of [EVENT / FESTIVAL / REASON FOR HOLIDAY].
+
+Example visual possibilities: - grand mosque architecture for Muharram
+or Eid related closure - Diwali lamps and exchange district skyline -
+Gandhi silhouette or monument for Gandhi Jayanti - Indian flag and
+government architecture for national holidays
+
+The architecture and cultural symbolism should be respectful, elegant
+and realistic.
+
+Use dramatic split lighting: dark stormy atmosphere on one side, warm
+golden sunlight on the other side.
+
+INFORMATION CARD: Add a premium black rectangular information card with
+thin gold border.
+
+Text hierarchy: “[EXCHANGE NAMES] WILL REMAIN” “[STATUS]” “[DATE OR
+DAY]”
+
+Make STATUS the largest word in bright gold.
+
+Reserve a clean lower section for verified exchange logos to be added
+later in post-production.
+
+HANGING STATUS BOARD: On the right side, add a realistic premium hanging
+market signboard suspended by thick gold ropes.
+
+Board text: “[MARKET STATUS]” “[FULL DATE]”
+
+Example: MARKET CLOSED 26 JUNE 2026
+
+The board should look physically realistic with: matte black surface,
+subtle gold border, metallic details, cinematic shadows, realistic rope
+tension.
+
+DATE SECTION: Create a calendar icon followed by:
+
+“[DATE]” “[DAY]”
+
+Use white for date and gold for day.
+
+EVENT REASON: Add a small symbolic icon representing the occasion.
+
+Text: “ON THE OCCASION OF” “[EVENT NAME]” “[YEAR]”
+
+Make EVENT NAME prominent in gold.
+
+BOTTOM FINANCIAL VISUAL: Show a realistic bronze bull and bear facing
+each other.
+
+Behind them: subtle green and red candlestick chart, dark trading floor
+atmosphere, reflections on polished black floor, soft market ticker
+glow.
+
+BOTTOM CTA: Add a small premium information box: “[SHORT CTA]”
+
+Example: PLAN YOUR TRADES, STAY AHEAD.
+
+At the bottom: “FOLLOW FOR MORE”
+
+Then three small categories: “DAILY UPDATES | STOCK MARKET INSIGHTS |
+SMART INVESTING”
+
+COMPOSITION RULES: Clear visual hierarchy. Do not overcrowd. Keep all
+important text within safe margins. Use strong grid alignment. Maintain
+premium spacing. No random decorative elements. No cartoon graphics. No
+cheap template appearance. No excessive neon. No fake or distorted
+logos. No spelling errors. No repeated words. No malformed architecture.
+No extra text.
+
+FINAL LOOK: Cinematic, premium, institutional, trustworthy, Indian
+financial media poster, photorealistic, editorial advertising quality,
+dramatic but credible.
+
+============================================================ PROMPT 2 —
+BREAKING GEOPOLITICAL NEWS / OIL / TRADE ROUTE STORY
+============================================================
+
+Create a high-impact vertical BREAKING NEWS poster about a major
+geopolitical development affecting global trade, crude oil, shipping
+routes or financial markets.
+
+FORMAT: Vertical portrait poster, 2:3 aspect ratio,
+ultra-high-resolution, cinematic editorial news photography style.
+
+TOP BREAKING NEWS BANNER: Create a bold horizontal banner across the
+top.
+
+Left section: Red background with white italic uppercase text:
+“BREAKING”
+
+Right section: Yellow background with black italic uppercase text:
+“NEWS”
+
+The banner should resemble a professional television financial-news
+alert, with strong typography and clean spacing.
+
+MAIN SCENE: Create a dramatic photorealistic aerial coastal scene
+representing:
+
+“[LOCATION / STRATEGIC WATERWAY / COUNTRY]”
+
+Show: - rugged coastal mountains, - deep blue strategic shipping
+channel, - multiple realistic commercial oil tankers, - cargo ships
+moving through the water, - visible shipping traffic, - realistic
+industrial port infrastructure, - distant radar or communications
+infrastructure.
+
+The scene should communicate economic importance and geopolitical
+tension without looking like a fictional war movie.
+
+NATIONAL CONTEXT: Include a large realistic flag of: “[COUNTRY]”
+
+The flag should be naturally positioned in the environment and correctly
+proportioned.
+
+GEOPOLITICAL TENSION ELEMENTS: In the distant sky, show a limited number
+of realistic military aircraft.
+
+Important: Aircraft should be secondary visual elements. Do not
+overcrowd the sky. Maintain realistic scale and atmospheric perspective.
+
+POLICY / TOLL VISUAL METAPHOR: Create a realistic checkpoint or
+toll-gate structure integrated into the port or shipping environment.
+
+Signboard text: “[SHORT POLICY LABEL]”
+
+Example: IRAN TOLL
+
+The toll structure should visually communicate: shipping fees, transit
+charges, strategic control, commercial restrictions.
+
+Do not make the structure look cartoonish.
+
+FOREGROUND LEADER / OFFICIAL: Place a large editorial-style portrait of
+a relevant political leader or government official in the lower-right
+foreground.
+
+Expression: serious, focused, statesmanlike.
+
+Lighting: cinematic rim light, natural skin texture, soft depth of
+field, subtle integration with the background.
+
+If exact identity is not essential, use a generic senior government
+official rather than imitating a specific real person.
+
+MAIN HEADLINE AREA: Create a dark black-to-transparent gradient across
+the lower 35% of the poster for readability.
+
+Add a large multi-line uppercase headline:
+
+“[HEADLINE LINE 1] [HEADLINE LINE 2] [HEADLINE LINE 3] [HEADLINE LINE
+4]”
+
+Example hierarchy: IRAN CONSIDERS CHARGING TAXES AND TOLL FEES TO CROSS
+THE STRAIT OF HORMUZ
+
+Highlight the most important phrases in amber-orange or gold.
+
+Use: white for supporting words, orange-gold for key economic or
+geopolitical terms.
+
+TYPOGRAPHY: Extra-bold geometric sans-serif. Very high readability.
+Large mobile-friendly text. Strong line spacing. No thin fonts. No text
+overlapping the face or important ships.
+
+MOOD: Urgent but credible. Serious financial-news tone. Global trade
+disruption atmosphere. Cinematic realism. Bright blue sky contrasted
+with geopolitical tension. Professional newsroom composition.
+
+NEGATIVE INSTRUCTIONS: No fake maps. No incorrect flags. No excessive
+explosions. No fantasy military equipment. No random soldiers. No text
+clutter. No distorted ships. No duplicated aircraft. No malformed faces.
+No unreadable text. No spelling mistakes. No sensational gore. No
+cartoon styling.
+
+FINAL LOOK: Premium global financial-news thumbnail, geopolitical
+editorial photography combined with modern television breaking-news
+graphics, cinematic realism, high contrast, professional editorial
+composition.
+
+============================================================ PROMPT 3 —
+CORPORATE FRAUD / STOCK CRASH / INVESTIGATIVE STORY
+============================================================
+
+Create a dark cinematic investigative financial documentary poster about
+a major corporate fraud, accounting scandal, regulatory investigation or
+stock market collapse.
+
+FORMAT: Vertical portrait poster, 2:3 aspect ratio,
+ultra-high-resolution. Dark investigative documentary aesthetic. Premium
+financial thriller visual language. Designed for Instagram, LinkedIn and
+YouTube Shorts cover.
+
+COLOR PALETTE: Deep black, charcoal, blood red, dark crimson, dirty
+newspaper beige, selective white typography, subtle amber city lights.
+
+OVERALL MOOD: Serious. Investigative. Financial destruction. Corporate
+secrecy. Investor losses. Market panic. Documentary credibility.
+
+TOP-LEFT MAIN TITLE: Create a huge stacked uppercase title:
+
+“[COMPANY OR CASE NAME]” “[EVENT TYPE]”
+
+Example: RAJESH EXPORT SCAM
+
+Use distressed condensed typography.
+
+Company/case name: off-white textured lettering.
+
+Event type: deep red distressed lettering.
+
+The headline should dominate the upper-left area.
+
+RIGHT-SIDE CORPORATE VISUAL: Show a dramatic low-angle view of:
+
+“[CORPORATE BUILDING / STOCK EXCHANGE BUILDING / FINANCIAL DISTRICT]”
+
+Use: dark stormy sky, heavy clouds, orange city lights, wet street
+reflections, ominous nighttime atmosphere, dramatic perspective.
+
+If a real building is not essential, create a generic financial exchange
+tower rather than falsely representing a specific location.
+
+STOCK COLLAPSE GRAPH: On the left side, integrate a large red
+candlestick chart falling sharply downward.
+
+Include: multiple declining red candles, steep downward arrow,
+percentage loss: “[DECLINE %]”
+
+Example: -79.80%
+
+The graph should look visually dramatic but clean.
+
+Do not create fake numerical market data beyond the values explicitly
+provided.
+
+CENTRAL INVESTIGATIVE SUBHEAD: Place a strong stacked subheadline in the
+center:
+
+“HOW IT” “[IMPACT WORD]” “INVESTOR” “WEALTH”
+
+Example: HOW IT DESTROYED INVESTOR WEALTH
+
+Use alternating white and red typography.
+
+Make the emotional impact word and WEALTH red.
+
+BOTTOM EVIDENCE TABLE: Create an investigative desk scene with
+overlapping financial newspapers and case files.
+
+Include three major documents:
+
+Document 1: Company name: “[COMPANY NAME]”
+
+Large red rubber stamp: “[CASE LABEL]”
+
+Example: SCAM FRAUD UNDER INVESTIGATION
+
+Include a small falling share-price graph.
+
+Document 2: Newspaper headline: “[INVESTIGATION HEADLINE]”
+
+Example: AGENCIES PROBE ALLEGED ₹6,000 CRORE FRAUD
+
+Document 3: Newspaper headline: “[INVESTOR IMPACT HEADLINE]”
+
+Example: INVESTORS LOSE CRORES
+
+IMPORTANT: All allegations must be worded accurately. If the matter is
+under investigation, use: “ALLEGED” “UNDER INVESTIGATION” “PROBE” or
+other legally accurate language.
+
+Do not visually present an unproven allegation as a final conviction.
+
+EVIDENCE PROPS: Add subtle investigative objects: - calculator, -
+financial statements, - paper clips, - audit papers, - handwritten
+calculation marks, - stock chart printouts.
+
+Keep them realistic and secondary.
+
+BOTTOM CTA BUTTON: Add a glowing dark-red documentary-style button:
+
+“[CTA TEXT]”
+
+Example: THE REAL STORY WHAT REALLY HAPPENED THE FULL BREAKDOWN
+
+Use white serif or bold editorial text.
+
+LIGHTING: Dark cinematic lighting. Red glow from falling chart. Warm
+building lights. Subtle rain reflections. Strong contrast. Deep shadows.
+Documentary thriller atmosphere.
+
+TYPOGRAPHY: Large condensed uppercase fonts. Distressed texture only for
+main title. Clean bold sans-serif for explanatory text. Strong
+readability on mobile screens.
+
+COMPOSITION: Top 40% = case identity and corporate visual. Middle 25% =
+stock crash and investor impact. Bottom 35% = documentary evidence and
+newspapers.
+
+NEGATIVE INSTRUCTIONS: No random fake statistics. No incorrect company
+logos. No fake regulator logos. No meaningless newspaper text. No
+excessive blood or violence imagery. No cartoon graphics. No crypto
+aesthetic. No cyberpunk aesthetic. No distorted buildings. No duplicated
+objects. No malformed typography. No cheap clickbait arrows everywhere.
+No exaggerated claims beyond supplied facts.
+
+FINAL LOOK: Premium investigative finance documentary poster, dark
+corporate thriller aesthetic, cinematic realism, institutional financial
+storytelling, dramatic stock market collapse visualization,
+sophisticated and credible.
+
+============================================================ PROMPT 4 —
+INDIAN DEFENCE SECTOR / DEFENCE STOCKS RALLY
+============================================================
+
+Create a powerful vertical financial-news poster focused on the Indian
+defence sector, defence manufacturing, military modernization, defence
+orders, government policy, exports, or a rally in Indian defence stocks.
+
+FORMAT: Vertical portrait poster, 2:3 aspect ratio,
+ultra-high-resolution, cinematic editorial finance poster, optimized for
+Instagram, LinkedIn, X and YouTube Shorts cover.
+
+OVERALL VISUAL STYLE: Premium Indian financial-news documentary
+aesthetic. Cinematic military-industrial atmosphere. Powerful, serious
+and authoritative. A combination of defence technology, national
+strategic strength and stock-market storytelling. Photorealistic,
+dramatic and editorial — not a video-game poster.
+
+COLOR PALETTE: Deep black and charcoal shadows, military olive and
+gunmetal grey, warm orange sunset, selective saffron, white and green
+details, bright financial yellow for important headline words,
+controlled red glow only for the bottom CTA.
+
+BACKGROUND AND SKY: Create a dramatic sunset sky with dense cinematic
+clouds. Use warm orange sunlight breaking through dark blue-grey clouds.
+Add subtle smoke, dust and atmospheric haze near the ground. The
+atmosphere should feel powerful and strategic, but not depict active
+destruction or civilian harm.
+
+TOP-LEFT NATIONAL SYMBOL: Place a large, realistic Indian national flag
+waving strongly in the wind.
+
+Requirements: Correct saffron, white and green horizontal bands. Correct
+navy-blue Ashoka Chakra centered in the white band. Natural fabric folds
+and realistic wind movement. Strong cinematic rim lighting. The flag
+should occupy the upper-left background without covering the headline.
+
+TOP-RIGHT AIR POWER VISUAL: Show one modern Indian military fighter
+aircraft flying dynamically upward across the upper-right sky.
+
+Requirements: Realistic scale and aerodynamic proportions. Indian Air
+Force roundel visible where appropriate. Cinematic sunlight reflecting
+from the aircraft body. Dynamic but believable flight angle. No missiles
+being fired. No explosions. No duplicated aircraft unless the story
+specifically requires a formation.
+
+MAIN HEADLINE: Use the left-middle portion of the poster for a huge
+stacked headline.
+
+Text: “[MAIN HEADLINE LINE 1]” “[MAIN HEADLINE LINE 2]” “[MAIN HEADLINE
+LINE 3]”
+
+Example: INDIAN DEFENCE SECTOR
+
+Typography: Ultra-bold condensed uppercase sans-serif. Slight distressed
+print texture. First and third lines in textured off-white. Most
+important sector keyword in strong financial yellow or gold.
+
+The headline must be extremely readable on a mobile screen. Use strong
+spacing and alignment. Do not overlap the aircraft or major defence
+equipment.
+
+RIGHT-SIDE DEFENCE INDUSTRIAL COMPOSITION: Create a layered
+photorealistic military-industrial scene showing selected Indian defence
+capabilities relevant to the news story.
+
+Possible elements: - modern battle tank in the lower-right foreground, -
+missile defence system or surface-to-air missile launchers in the
+midground, - large radar system in the right background, - fighter
+aircraft in the sky, - subtle defence manufacturing facility
+silhouettes, - optional naval vessel if the story concerns shipbuilding
+or naval orders.
+
+IMPORTANT: Use only 3–4 major defence elements. Do not overcrowd the
+composition. Maintain realistic scale and depth. Equipment should look
+credible and technically coherent. Avoid fantasy weapons or impossible
+combinations.
+
+FOREGROUND TANK: Place a large modern battle tank in the lower-right
+foreground.
+
+Visual requirements: Low-angle cinematic perspective. Heavy metallic
+details. Realistic tracks, armour plates, optics and turret. Subtle
+Indian tricolour identification marking where visually appropriate. Dust
+and atmospheric particles around the tracks. Warm sunset highlights on
+metal surfaces. Tank barrel directed safely away from the viewer. No
+firing or explosions.
+
+MISSILE AND RADAR SECTION: Behind the tank, create a vertical defence
+technology composition.
+
+Include: 2–3 realistic missile canisters or interceptors, a large
+phased-array radar unit, military support structures in the background.
+
+If the story is about a specific verified defence system, visually
+represent that system accurately. If accuracy cannot be guaranteed, use
+a generic modern Indian air-defence system rather than incorrect labels.
+
+SECONDARY QUESTION / EXPLAINER HEADLINE: In the lower-left section,
+create a smaller stacked question:
+
+“[QUESTION LINE 1]” “[QUESTION LINE 2]” “[QUESTION LINE 3]”
+
+Example: WHY DEFENCE STOCKS RALLYING?
+
+Typography hierarchy: “WHY” in bold white. “DEFENCE” in bold white.
+“STOCKS” in bright financial yellow. “RALLYING?” in bright financial
+yellow.
+
+Use clean bold condensed typography. Keep this secondary headline
+significantly smaller than the main sector title.
+
+OPTIONAL MARKET CONTEXT: If relevant to the story, subtly integrate: -
+faint upward candlestick chart, - soft green market line, - small
+order-book document silhouettes, - defence contract papers, - export
+shipment silhouettes, - factory lights.
+
+These elements must remain subtle and should not compete with the
+defence visuals.
+
+BOTTOM CTA: Create a large premium glowing red rectangular button with
+rounded corners and a bright red neon border.
+
+CTA text: “[CTA TEXT]”
+
+Example: REAL TRUTH FULL STORY WHY STOCKS ARE RISING THE REAL REASON
+
+Use huge bold white uppercase typography. The CTA must be readable
+instantly but should not look like a cheap clickbait button.
+
+LIGHTING: Strong cinematic sunset backlight. Warm orange rim light on
+aircraft, missiles, radar and tank. Deep shadows in lower sections.
+Subtle dust particles and sparks in the atmosphere. High contrast
+without crushing all shadow detail. Realistic metal reflections.
+Volumetric light rays through clouds.
+
+COMPOSITION STRUCTURE: Upper 25%: Indian flag + dramatic sky + fighter
+aircraft.
+
+Middle 45%: Huge main headline on left + missiles/radar on right.
+
+Lower 30%: Secondary explainer question on left + tank on right + CTA
+near bottom.
+
+TEXT SAFE AREA: Keep all text within safe margins. No headline touching
+the edge. No text hidden behind equipment. Ensure visual hierarchy
+remains clear even on a small mobile display.
+
+EDITORIAL ACCURACY RULES: Do not imply that all defence stocks are
+rising unless verified. Do not invent defence orders, contract values,
+export figures or government announcements. Do not use the logo or exact
+product name of a defence company unless supplied and verified. If the
+story concerns one company, visually focus on the relevant defence
+segment rather than implying the entire sector moved. Use accurate
+language such as: “DEFENCE STOCKS RALLY” “SELECT DEFENCE STOCKS GAIN”
+“NEW ORDER BOOST” “EXPORT MOMENTUM” “POLICY PUSH” only when supported by
+the supplied story data.
+
+NEGATIVE INSTRUCTIONS: No war destruction. No civilian casualties. No
+blood or gore. No active missile launch toward a target. No explosions
+unless the verified story specifically concerns combat footage and such
+imagery is editorially necessary. No fantasy aircraft. No impossible
+weapon systems. No incorrect national flag. No malformed Ashoka Chakra.
+No random military logos. No fake company logos. No invented stock
+prices. No fake percentage gains. No duplicated tanks. No malformed
+wheels or tracks. No distorted aircraft wings. No excessive sparks. No
+video-game aesthetic. No cartoon appearance. No cheap template design.
+No excessive text. No spelling mistakes. No meaningless labels on
+missiles. No unnecessary patriotic slogans.
+
+FINAL LOOK: Premium Indian defence-sector financial news poster,
+cinematic realism, powerful sunset lighting, strategic
+military-industrial visual storytelling, high-impact mobile readability,
+institutional finance-meets-defence editorial aesthetic, dramatic but
+credible, sophisticated and professional.

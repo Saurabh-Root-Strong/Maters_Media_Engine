@@ -86,6 +86,7 @@ def api_config():
     from engine import imagegen
     c = policy.Config.from_env()
     return jsonify({"web_search": llm.web_search_enabled(), "image_backend": imagegen.backend(),
+                    "image_templates": imagegen.templates(),
                     "live": c.live, "auto": c.auto_publish})
 
 
@@ -110,9 +111,11 @@ def api_generate():
 
     web_search = body.get("web_search")     # None -> env default; bool -> override
     image_backend = body.get("image_backend")  # None / "template" / "openai"
+    image_template = body.get("image_template")  # None / "auto" / a template id
     try:
         result = orchestrator.run(topic, platforms_selected=selected,
-                                  use_search=web_search, image_backend=image_backend)
+                                  use_search=web_search, image_backend=image_backend,
+                                  image_template=image_template)
     except Exception as exc:  # noqa: BLE001
         return jsonify({"error": f"Generation failed: {exc}"}), 500
 
