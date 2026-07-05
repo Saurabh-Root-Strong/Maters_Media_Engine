@@ -90,7 +90,8 @@ def output_file(name: str):
 def api_generate():
     body = request.json or {}
     topic = body.get("topic", "").strip()
-    selected = body.get("platforms") or ["twitter", "instagram", "linkedin"]
+    # .get(default) — not `or` — so an explicit [] means "none" (400), not "all".
+    selected = body.get("platforms", ["twitter", "instagram", "linkedin"])
     selected = [p for p in selected if p in BY_KEY]
     if not topic:
         return jsonify({"error": "Enter a topic."}), 400
@@ -107,6 +108,8 @@ def api_generate():
     run_id = uuid.uuid4().hex
     frozen = manifest.build(result, approved_by="dashboard")
     _RUNS[run_id] = {"frozen": frozen, "review": result["review"]}
+    while len(_RUNS) > 50:  # bound memory — drop the oldest run
+        del _RUNS[next(iter(_RUNS))]
 
     image = result.get("image") or {}
     image_url = f"/output/{os.path.basename(image['path'])}" if image.get("path") else None

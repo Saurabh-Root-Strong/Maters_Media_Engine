@@ -86,6 +86,17 @@ preferred), or force it with `MEDIA_ENGINE_PROVIDER=openai|anthropic`:
 Only `engine/llm.py` is provider-specific; the rest of the pipeline is
 provider-agnostic.
 
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+Offline suite (LLM mocked, no API cost) covering the policy scenario matrix,
+the review gate, the scheduler, publishers, the manifest, and dashboard
+enforcement.
+
 ## Roadmap
 
 - ~~**v1** — render the Instagram image~~ ✅ done

@@ -49,7 +49,8 @@ def _openai():
     global _client
     if _client is None:
         from openai import OpenAI
-        _client = OpenAI()
+        # max_retries covers transient 429/5xx/connection errors with backoff.
+        _client = OpenAI(max_retries=4, timeout=120.0)
     return _client
 
 
