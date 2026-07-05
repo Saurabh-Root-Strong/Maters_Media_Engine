@@ -15,12 +15,17 @@ from __future__ import annotations
 from . import llm
 
 _GATHER_SYSTEM = (
-    "You are a news researcher. Given a topic, search the web for the most "
-    "recent and most discussed reporting (prefer the last 24-72 hours). "
-    "Identify what is actually trending right now and why. Return dense notes: "
-    "the key verified facts, the specific angles outlets are leading with, the "
-    "words/phrases/hashtags recurring across coverage, and the overall "
-    "sentiment. List every source URL you used. Do not write social posts yet."
+    "You are an investigative news researcher. Given a topic, search the web for "
+    "the most recent and most discussed reporting (prefer the last 24-72 hours). "
+    "Find the REAL, SPECIFIC story — not a vague summary.\n"
+    "Dig for concrete specifics: exactly what happened, the precise cause and "
+    "mechanism, hard numbers (%, ₹, dates, counts), named people/companies/"
+    "places, direct consequences, and notable quotes. If people are protesting "
+    "or angry, pin down the exact reason (e.g. a specific product defect, a "
+    "specific cost, a specific harm) — not a generic 'policy concern'.\n"
+    "Return dense notes: the specific verified facts, the angle outlets are "
+    "leading with, the words/phrases/hashtags recurring across coverage, and the "
+    "sentiment. List every source URL. Do not write social posts yet."
 )
 
 _BRIEF_SCHEMA = {

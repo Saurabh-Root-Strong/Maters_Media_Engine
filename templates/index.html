@@ -37,6 +37,7 @@
     border-radius:7px; padding:7px 9px; font-size:14px; }
   .banner { padding:12px 16px; border-radius:9px; margin-bottom:18px; display:none; }
   .banner.err { background:#2d1417; border:1px solid var(--bad); color:#ffb3b0; }
+  .banner.warn { background:#2a2410; border:1px solid var(--warn); color:#e8cf8a; }
   .spinner { display:none; color:var(--dim); margin:40px 0; text-align:center; }
   .meta { background:var(--panel); border:1px solid var(--line); border-radius:12px;
     padding:16px 18px; margin-bottom:20px; }
@@ -125,6 +126,10 @@
   </div>
 
   <div class="banner err" id="err"></div>
+  <div class="banner warn" id="searchnote" style="display:none">
+    ⚠ Generated <b>without live web search</b> — content may be generic or out of date.
+    Tick <b>Live web search</b> above and regenerate for the real, current story.
+  </div>
   <div class="spinner" id="spin">Researching, drafting, rendering&hellip; (~30-60s)</div>
   <div id="out"></div>
 
@@ -164,12 +169,14 @@ async function generate() {
   const plats = selectedPlatforms();
   if (!topic) return;
   if (!plats.length){ showErr("Pick at least one platform."); return; }
-  $("err").style.display="none"; $("out").innerHTML="";
+  const ws = $("websearch").checked;
+  $("err").style.display="none"; $("searchnote").style.display="none"; $("out").innerHTML="";
   $("go").disabled=true; $("spin").style.display="block";
   try {
     const d = await api("/api/generate", {topic, platforms:plats,
-      web_search:$("websearch").checked, image_backend:$("imgbackend").value});
+      web_search:ws, image_backend:$("imgbackend").value});
     RUN = d.run_id; render(d);
+    if (!ws) $("searchnote").style.display="block";
   } catch(e) { showErr(e.message); }
   finally { $("go").disabled=false; $("spin").style.display="none"; }
 }

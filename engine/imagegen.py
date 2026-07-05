@@ -33,14 +33,21 @@ def backend() -> str:
     return _BACKEND
 
 _SPEC_SYSTEM = (
-    "You design a single square Instagram news card. Given the post draft, "
-    "return a compact design brief. headline: <= 10 words, punchy, the one "
-    "thing to read. subhead: <= 14 words of supporting context. badge: 1-2 "
-    "uppercase words for a corner tag (e.g. BREAKING, EXPLAINER, TIMELINE). "
-    "Colors are hex like #1A2B3C: pick a background gradient (top/bottom) and "
-    "an accent that fit the topic's mood; ensure text will be readable on it. "
-    "Respect any sensitivity in the topic — restrained palette, no lurid red "
-    "for tragedy."
+    "You art-direct a single square social image for a news post. Return a "
+    "compact design brief.\n"
+    "- headline: <= 10 words, punchy, the one thing to read.\n"
+    "- subhead: <= 14 words of supporting context.\n"
+    "- badge: 1-2 uppercase words for a corner tag (BREAKING, EXPLAINER...).\n"
+    "- bg_top_hex / bg_bottom_hex / accent_hex: hex colours fitting the topic's "
+    "mood; text must stay readable. Restrained palette for sensitive topics.\n"
+    "- visual_style: the art style that best fits THIS story — choose freshly, "
+    "e.g. 'cinematic photoreal composite', 'bold modern editorial graphic', "
+    "'clean data-driven infographic', 'dramatic news poster'. Don't default to "
+    "the same style every time.\n"
+    "- image_concept: a vivid, SPECIFIC visual scene tied to this exact story — "
+    "name the concrete subjects, objects and setting (e.g. a corroded car fuel "
+    "tank, an ethanol pump nozzle, frustrated Indian motorists), the mood and "
+    "lighting. Concrete and unique to the news — never a generic stock scene."
 )
 
 _SPEC_SCHEMA = {
@@ -52,14 +59,13 @@ _SPEC_SCHEMA = {
         "bg_top_hex": {"type": "string"},
         "bg_bottom_hex": {"type": "string"},
         "accent_hex": {"type": "string"},
+        "visual_style": {"type": "string"},
+        "image_concept": {"type": "string"},
     },
     "required": [
-        "headline",
-        "subhead",
-        "badge",
-        "bg_top_hex",
-        "bg_bottom_hex",
-        "accent_hex",
+        "headline", "subhead", "badge",
+        "bg_top_hex", "bg_bottom_hex", "accent_hex",
+        "visual_style", "image_concept",
     ],
     "additionalProperties": False,
 }
@@ -191,16 +197,16 @@ def render(spec: dict, out_path: str) -> str:
 # --- generative backend (OpenAI images) --------------------------------------
 
 def _poster_prompt(spec: dict, angle: dict) -> str:
+    style = spec.get("visual_style") or "bold modern editorial news graphic"
+    concept = spec.get("image_concept") or angle.get("angle", "")
     return (
-        "Dramatic, high-impact editorial exposé poster, square 1:1 composition. "
-        f'Bold distressed condensed UPPERCASE headline reading exactly "{spec["headline"]}" '
-        "in white and blood-red grunge lettering, very high contrast, cinematic. "
-        f'A smaller supporting line: "{spec["subhead"]}". '
-        "Dark moody layered background suited to the topic — for finance/markets use a "
-        "crashing red stock chart, a faint city skyline or stock-exchange building, torn "
-        "newspaper clippings and a red warning stamp; adapt the imagery to the subject "
-        f"({angle.get('angle', '')}). Serious, attention-grabbing news tone. "
-        "Spell all text exactly as given — no gibberish text, no watermark, no logos."
+        f"{style}, square 1:1, modern, high production value, sharp and contemporary. "
+        f"Depict this specific scene: {concept}. "
+        f'Integrate a bold, legible headline reading exactly "{spec["headline"]}" and a '
+        f'smaller supporting line "{spec["subhead"]}", with clean tasteful typography that '
+        "fits the composition. Strong visual hierarchy, professional finish. "
+        "Spell all text exactly as given — no gibberish text, no watermark, no logos, "
+        "no stock-photo blandness."
     )
 
 
