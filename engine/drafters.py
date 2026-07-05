@@ -55,10 +55,17 @@ def _system_for(spec: dict) -> str:
             " graphic (readable headline text over a fitting background), and"
             " alt_text describing it."
         )
+    fmt = (spec.get("format") or "").strip()
+    format_block = (
+        f"\n\nFORMAT — follow this exact structure/style, it overrides the "
+        f"general style above:\n{fmt}\n"
+        if fmt else ""
+    )
     return (
         f"You are an expert {spec['label']} writer.\n\n"
-        f"Style: {spec['style'].strip()}\n\n"
-        "Rules:\n- " + "\n- ".join(limits) + "\n\n"
+        f"Style: {spec['style'].strip()}"
+        + format_block
+        + "\n\nRules:\n- " + "\n- ".join(limits) + "\n\n"
         "Write the post so it lands the given key message using the chosen "
         "angle and the verified facts. Do not invent facts beyond the brief. "
         "Respect any sensitivity flags."

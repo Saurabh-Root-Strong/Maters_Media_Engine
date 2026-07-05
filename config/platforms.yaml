@@ -1,5 +1,9 @@
 # Per-platform style + hard limits. Drafters read this so rules live in config,
 # not code. Edit tone/limits here without touching Python.
+#
+# `format:` is YOUR custom template — paste your exact structure/example here
+# and it OVERRIDES the general `style`. Leave blank to use the default style.
+# You can use section labels, line-by-line structure, or a full example post.
 
 instagram:
   label: Instagram
@@ -7,6 +11,7 @@ instagram:
     Punchy, scroll-stopping caption. Hook in the first line (visible before
     "more"). Conversational, a little emoji. End with one clear call-to-action
     (comment / save / share). 3-5 tightly relevant hashtags, no hashtag soup.
+  format: ""     # <- paste your Instagram image-post format here
   caption_max_chars: 2200
   hashtags_min: 3
   hashtags_max: 5
@@ -18,6 +23,7 @@ twitter:
     Single short burst. One sharp hook line that stands alone. No thread.
     Punchy, opinionated, quotable. At most 2 hashtags. Fit comfortably under
     the limit — do not pad to fill it.
+  format: ""     # <- paste your tweet format here
   caption_max_chars: 280
   hashtags_min: 0
   hashtags_max: 2
@@ -31,6 +37,7 @@ linkedin:
     Professional but human — no corporate cringe, no "I am humbled to
     announce". Short paragraphs, whitespace between them. End with a
     reflective question or takeaway. 3-5 hashtags at the very end.
+  format: ""     # <- paste your LinkedIn storytelling format here
   caption_max_chars: 2000
   caption_min_chars: 1000
   hashtags_min: 3
