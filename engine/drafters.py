@@ -91,8 +91,7 @@ def redraft(platform: str, spec: dict, brief: dict, angle: dict, issues: list[st
         + f"\n\nRewrite the {spec['label']} post, keeping everything else good."
     )
     draft = llm.structured(_system_for(spec), user, _schema_for(spec), max_tokens=3000)
-    if spec.get("mentions"):
-        draft["caption"] = draft["caption"].rstrip() + "\n\n" + " ".join(spec["mentions"])
+    _apply_fixed(draft, spec)
     return draft
 
 
@@ -131,11 +130,24 @@ def draft_all(brief: dict, angle: dict, selected: list[str] | None = None) -> di
         + "\n\nWrite every post now."
     )
     drafts = llm.structured(system, user, schema, max_tokens=3500)
-
-    # Append fixed account @mentions verbatim (kept out of the LLM so handles
-    # are never misspelled or invented).
     for key, spec in platforms.items():
-        mentions = spec.get("mentions")
-        if mentions and key in drafts:
-            drafts[key]["caption"] = drafts[key]["caption"].rstrip() + "\n\n" + " ".join(mentions)
+        if key in drafts:
+            _apply_fixed(drafts[key], spec)
     return drafts
+
+
+def _apply_fixed(draft: dict, spec: dict) -> None:
+    """Apply deterministic, config-driven bits the LLM shouldn't own:
+    fixed @mentions (never misspelled) and always-on brand hashtags."""
+    mentions = spec.get("mentions")
+    if mentions:
+        draft["caption"] = draft["caption"].rstrip() + "\n\n" + " ".join(mentions)
+
+    always = spec.get("always_hashtags")
+    if always:
+        forced = [h.lstrip("#") for h in always]
+        lower = {f.lower() for f in forced}
+        existing = [h.lstrip("#") for h in draft.get("hashtags", []) if h.lstrip("#").lower() not in lower]
+        merged = forced + existing
+        cap = spec.get("hashtags_max")
+        draft["hashtags"] = merged[:cap] if cap else merged

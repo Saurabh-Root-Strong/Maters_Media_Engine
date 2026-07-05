@@ -17,6 +17,9 @@ instagram:
     style line, and credit the brand "The Market Tales".]
 
     (Hashtags are added separately — ALWAYS include #TheMarketTales among them.)
+  # Always-present brand hashtag (guaranteed, dedup'd, fills up to hashtags_max).
+  always_hashtags:
+    - "TheMarketTales"
   # Fixed account tags appended verbatim to the caption (never model-generated).
   mentions:
     - "@nseindia"
