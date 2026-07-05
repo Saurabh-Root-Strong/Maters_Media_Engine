@@ -56,9 +56,11 @@ _DISTILL_SYSTEM = (
 )
 
 
-def gather(topic: str) -> str:
+def gather(topic: str, use_search: bool | None = None) -> str:
     return llm.run_with_web_search(
-        _GATHER_SYSTEM, f"Topic: {topic}\n\nResearch what is trending about this now."
+        _GATHER_SYSTEM,
+        f"Topic: {topic}\n\nResearch what is trending about this now.",
+        use_search=use_search,
     )
 
 
@@ -68,6 +70,6 @@ def distill(notes: str) -> dict:
     )
 
 
-def research(topic: str) -> dict:
+def research(topic: str, use_search: bool | None = None) -> dict:
     """Topic -> structured brief dict."""
-    return distill(gather(topic))
+    return distill(gather(topic, use_search))

@@ -81,6 +81,13 @@ def index():
     return render_template("index.html")
 
 
+@app.get("/api/config")
+def api_config():
+    c = policy.Config.from_env()
+    return jsonify({"web_search": llm.web_search_enabled(),
+                    "live": c.live, "auto": c.auto_publish})
+
+
 @app.get("/output/<path:name>")
 def output_file(name: str):
     return send_from_directory(_OUT_DIR, name)
@@ -100,8 +107,9 @@ def api_generate():
     if not llm.has_api_key():
         return jsonify({"error": f"{llm.key_var()} not set — add it to .env and restart."}), 400
 
+    web_search = body.get("web_search")  # None -> env default; bool -> override
     try:
-        result = orchestrator.run(topic, platforms_selected=selected)
+        result = orchestrator.run(topic, platforms_selected=selected, use_search=web_search)
     except Exception as exc:  # noqa: BLE001
         return jsonify({"error": f"Generation failed: {exc}"}), 500
 

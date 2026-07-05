@@ -20,13 +20,14 @@ def _slug(topic: str) -> str:
     return "-".join(keep.lower().split())[:50] or "post"
 
 
-def run(topic: str, platforms_selected: list[str] | None = None, on_progress=None) -> dict:
+def run(topic: str, platforms_selected: list[str] | None = None,
+        use_search: bool | None = None, on_progress=None) -> dict:
     def note(msg: str) -> None:
         if on_progress:
             on_progress(msg)
 
-    note("Researching + detecting trends (web search)...")
-    brief = research.research(topic)
+    note("Researching + detecting trends...")
+    brief = research.research(topic, use_search=use_search)
 
     note("Choosing the angle...")
     angle = angle_stage.choose(brief)

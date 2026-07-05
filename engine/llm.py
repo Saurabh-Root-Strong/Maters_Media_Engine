@@ -64,7 +64,7 @@ def _openai():
     return _client
 
 
-def _openai_web(system: str, user: str) -> str:
+def _openai_web(system: str, user: str, use_search: bool) -> str:
     kwargs = dict(
         model=_OPENAI_MODEL,
         input=[
@@ -72,7 +72,7 @@ def _openai_web(system: str, user: str) -> str:
             {"role": "user", "content": user},
         ],
     )
-    if _WEB_SEARCH:
+    if use_search:
         kwargs["tools"] = [{"type": "web_search_preview"}]
     resp = _openai().responses.create(**kwargs)
     return (resp.output_text or "").strip()
@@ -110,13 +110,13 @@ def _anthropic_text(response) -> str:
     return "".join(b.text for b in response.content if b.type == "text").strip()
 
 
-def _anthropic_web(system: str, user: str, max_continuations: int = 6) -> str:
+def _anthropic_web(system: str, user: str, use_search: bool, max_continuations: int = 6) -> str:
     client = _anthropic()
     kwargs = dict(
         model=_ANTHROPIC_MODEL, max_tokens=8000, system=system,
         thinking={"type": "adaptive"}, output_config={"effort": _ANTHROPIC_EFFORT},
     )
-    if _WEB_SEARCH:
+    if use_search:
         kwargs["tools"] = [_WEB_SEARCH_TOOL]
     resp = client.messages.create(messages=[{"role": "user", "content": user}], **kwargs)
     cont = 0
@@ -145,10 +145,12 @@ def _anthropic_structured(system: str, user: str, schema: dict, max_tokens: int)
 
 # =============================== dispatch ===================================
 
-def run_with_web_search(system: str, user: str) -> str:
+def run_with_web_search(system: str, user: str, use_search: bool | None = None) -> str:
+    """use_search: None -> env default (_WEB_SEARCH); True/False overrides it."""
+    flag = _WEB_SEARCH if use_search is None else bool(use_search)
     if PROVIDER == "openai":
-        return _openai_web(system, user)
-    return _anthropic_web(system, user)
+        return _openai_web(system, user, flag)
+    return _anthropic_web(system, user, flag)
 
 
 def structured(system: str, user: str, schema: dict, max_tokens: int = 4000) -> dict:
