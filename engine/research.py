@@ -46,8 +46,13 @@ def _sources_block() -> str:
     lines = "\n".join(f"- {s['name']}: {s.get('hint', '')}" for s in sources)
     return (
         "\n\nPRIORITISE these sources — run a targeted search on each (e.g. "
-        "'<topic> site:moneycontrol.com'), and cross-check the story across at "
-        "least THREE of them before trusting a claim:\n" + lines
+        "'<topic> site:economictimes.indiatimes.com'), and cross-check the story "
+        "across at least THREE of them before trusting a claim:\n" + lines
+        + "\n\nFALLBACK: if these sources don't have solid, recent, specific "
+        "coverage of the topic, broaden to a general Google/web search and keep "
+        "searching until you find concrete verifiable facts. NEVER stop at thin, "
+        "vague, or generic notes — if the first searches come up weak, try "
+        "different queries and more sources before returning."
     )
 
 

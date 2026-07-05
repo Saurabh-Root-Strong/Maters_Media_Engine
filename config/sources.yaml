@@ -1,10 +1,10 @@
 # Preferred research sources. The researcher runs a targeted search on each and
 # cross-checks the story across them. Add/remove freely — order = rough priority.
 sources:
+  - name: Economic Times
+    hint: economictimes.indiatimes.com — markets & business (top priority)
   - name: Moneycontrol
     hint: moneycontrol.com — Indian markets, stocks, business
-  - name: Economic Times Markets
-    hint: economictimes.indiatimes.com/markets
   - name: LiveMint
     hint: livemint.com — markets & economy
   - name: The Indian Express
@@ -17,3 +17,5 @@ sources:
     hint: pulse.zerodha.com — aggregated Indian market news
   - name: X / Twitter trends
     hint: trending finance/market discussion on X (twitter.com)
+  - name: Google (general web)
+    hint: FALLBACK — general Google/web search when the sources above lack solid coverage
