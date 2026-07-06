@@ -7,17 +7,37 @@ the user can click to generate — no more guessing a topic.
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 from . import llm, memory
 from .research import _sources_block
 
-_SCOUT_SYSTEM = (
-    "You are a markets news scout for an Indian finance social page. Search the "
-    "web RIGHT NOW for the most current, genuinely trending, SPECIFIC and "
-    "postable stories (last 24-48h) in this niche. Prefer concrete stories — a "
-    "named company, a number, an event, a policy move — over vague themes. "
-    "Return dense notes with the story and why it matters to investors, plus "
-    "source URLs."
-)
+MAX_AGE_DAYS = 10  # hard freshness cutoff for trending suggestions
+
+_IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def _today() -> datetime:
+    return datetime.now(_IST)
+
+
+def _scout_system() -> str:
+    today = _today()
+    cutoff = today - timedelta(days=MAX_AGE_DAYS)
+    return (
+        f"TODAY'S DATE IS {today:%d %B %Y} (IST). Use this as your anchor for "
+        "what counts as recent — do not trust your memory of 'current' events.\n"
+        "You are a markets news scout for an Indian finance social page. Search "
+        "the web RIGHT NOW for the most current, genuinely trending, SPECIFIC "
+        "and postable stories. STRICT freshness rule: only stories PUBLISHED "
+        f"after {cutoff:%d %B %Y} (last {MAX_AGE_DAYS} days) — strongly prefer "
+        "the last 24-72 hours. For EVERY story, note its publication date from "
+        "the source; if you cannot confirm it is recent, DISCARD it. Prefer "
+        "concrete stories — a named company, a number, an event, a policy move — "
+        "over vague themes or evergreen explainers. Return dense notes with each "
+        "story, its publication date, why it matters to investors, and source "
+        "URLs."
+    )
 
 # Trending categories the user can pick in the dashboard. `focus` steers the
 # scout; `n` = how many suggestions to return.
@@ -67,8 +87,9 @@ _EXTRACT_SCHEMA = {
                 "properties": {
                     "topic": {"type": "string"},   # postable as a generation topic
                     "why": {"type": "string"},     # one line: why it matters now
+                    "date": {"type": "string"},    # publication date, YYYY-MM-DD
                 },
-                "required": ["topic", "why"],
+                "required": ["topic", "why", "date"],
                 "additionalProperties": False,
             },
         }
@@ -76,6 +97,15 @@ _EXTRACT_SCHEMA = {
     "required": ["topics"],
     "additionalProperties": False,
 }
+
+
+def _fresh_enough(date_str: str) -> bool:
+    """Code-level enforcement of the age cutoff. Unparseable date -> drop."""
+    try:
+        d = datetime.strptime(date_str.strip()[:10], "%Y-%m-%d").replace(tzinfo=_IST)
+    except ValueError:
+        return False
+    return (_today() - d).days <= MAX_AGE_DAYS
 
 
 def suggest(n: int | None = None, use_search: bool = True,
@@ -93,15 +123,21 @@ def suggest(n: int | None = None, use_search: bool = True,
                   + "\n- ".join(avoid)) if avoid else ""
 
     notes = llm.run_with_web_search(
-        _SCOUT_SYSTEM + _sources_block(),
+        _scout_system() + _sources_block(),
         f"Niche: {niche}\n\nFind the top {n} trending, specific, postable stories "
         f"right now.{avoid_line}",
         use_search=use_search,
     )
+    today = _today()
     extract_system = (
-        f"From the research notes, return the {n} best distinct, specific, "
-        "postable story ideas. `topic` should read like a clear generation topic "
-        "(a concrete headline-style phrase), `why` one line on why it matters now."
+        f"Today is {today:%Y-%m-%d}. From the research notes, return the {n} "
+        "best distinct, specific, postable story ideas. `topic` = a concrete "
+        "headline-style generation topic; `why` = one line on why it matters "
+        "now; `date` = the story's publication date as YYYY-MM-DD taken from "
+        f"the notes. EXCLUDE anything older than {MAX_AGE_DAYS} days or whose "
+        "date you cannot determine from the notes."
     )
     result = llm.structured(extract_system, f"NOTES:\n\n{notes}", _EXTRACT_SCHEMA)
-    return result["topics"][:n]
+    # Belt and braces: enforce the cutoff in code too.
+    fresh = [t for t in result["topics"] if _fresh_enough(t.get("date", ""))]
+    return fresh[:n]

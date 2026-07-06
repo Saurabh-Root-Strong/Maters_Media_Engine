@@ -13,12 +13,14 @@ over the gathered text. Keeps each call simple and debuggable.
 from __future__ import annotations
 
 import os
+from datetime import datetime, timedelta, timezone
 
 import yaml
 
 from . import llm
 
 _SOURCES_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "sources.yaml")
+_IST = timezone(timedelta(hours=5, minutes=30))
 
 _GATHER_BASE = (
     "You are an investigative news researcher. Given a topic, search the web for "
@@ -57,7 +59,13 @@ def _sources_block() -> str:
 
 
 def _gather_system() -> str:
-    return _GATHER_BASE + _sources_block()
+    today = datetime.now(_IST)
+    anchor = (
+        f"TODAY'S DATE IS {today:%d %B %Y} (IST) — anchor all recency judgements "
+        "to this, not to your training memory. Note each source's publication "
+        "date and prefer the newest coverage.\n\n"
+    )
+    return anchor + _GATHER_BASE + _sources_block()
 
 _BRIEF_SCHEMA = {
     "type": "object",

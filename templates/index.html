@@ -323,7 +323,7 @@ async function loadTrending() {
     box.innerHTML = "";
     for (const t of (d.topics||[])) {
       const el = document.createElement("div"); el.className = "trendchip";
-      el.innerHTML = `<b>${esc(t.topic)}</b><div class="why">${esc(t.why)}</div>`;
+      el.innerHTML = `<b>${esc(t.topic)}</b><div class="why">${t.date?`<span style="color:var(--accent)">${esc(t.date)}</span> · `:""}${esc(t.why)}</div>`;
       el.onclick = () => { $("topic").value = t.topic; box.style.display="none"; generate(); };
       box.appendChild(el);
     }
