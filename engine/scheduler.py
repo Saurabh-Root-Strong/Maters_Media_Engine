@@ -16,7 +16,6 @@ import os
 import threading
 import time
 import uuid
-from datetime import datetime
 
 from .publishers import BY_KEY
 
@@ -52,7 +51,10 @@ class Scheduler:
                 try:
                     with open(os.path.join(_DIR, name), encoding="utf-8") as f:
                         job = json.load(f)
-                    self._jobs[job["id"]] = job
+                    # Terminal jobs stay on disk as the audit trail but don't
+                    # belong in memory — only pending/error can still act.
+                    if job.get("status") in ("pending", "error"):
+                        self._jobs[job["id"]] = job
                 except Exception:  # noqa: BLE001 — skip a corrupt job file
                     continue
 

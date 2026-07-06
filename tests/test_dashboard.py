@@ -99,6 +99,22 @@ def test_schedule_past_rejected(client):
     assert r.status_code == 400
 
 
+def test_schedule_nan_and_inf_rejected(client):
+    rid = _inject({"sensitive": False, "gate": {"twitter": {"verdict": "PASS"}}})
+    for bad in ("NaN", "Infinity"):
+        r = client.post("/api/schedule", json={"run_id": rid, "platform": "twitter",
+                                               "when_epoch": bad})
+        assert r.status_code == 400, bad
+
+
+def test_generate_null_topic_and_bad_body(client, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "x")
+    r = client.post("/api/generate", json={"topic": None})
+    assert r.status_code == 400  # not a 500 AttributeError
+    r = client.post("/api/generate", data="not json", content_type="text/plain")
+    assert r.status_code == 400  # not a 415 HTML page
+
+
 def test_schedule_future_ok_then_cancel(client):
     rid = _inject({"sensitive": False, "gate": {"twitter": {"verdict": "PASS"}}})
     r = client.post("/api/schedule", json={"run_id": rid, "platform": "twitter",

@@ -44,6 +44,17 @@ def char_count(caption: str, spec: dict) -> int:
     return len(caption)
 
 
+def post_text(draft: dict) -> str:
+    """The text as it will actually publish: caption + appended hashtags.
+
+    Must mirror publishers.base._post_text — the limit check has to measure
+    what goes out, not the bare caption.
+    """
+    caption = (draft.get("caption") or "").strip()
+    tags = " ".join(f"#{h.lstrip('#')}" for h in draft.get("hashtags", []) or [])
+    return f"{caption}\n\n{tags}".strip() if tags else caption
+
+
 # --- layer 1: deterministic limits -------------------------------------------
 
 def validate(drafts: dict, platforms: dict | None = None) -> dict:
@@ -54,14 +65,17 @@ def validate(drafts: dict, platforms: dict | None = None) -> dict:
         spec = platforms.get(key, {})
         issues: list[dict] = []
         caption = draft.get("caption", "") or ""
-        n = char_count(caption, spec)
+        # Measure the FULL outgoing post (caption + hashtags), not the bare
+        # caption — hashtags are appended at publish time and count on X.
+        n = char_count(post_text(draft), spec)
 
         if not caption.strip():
             issues.append({"level": "hard", "msg": "caption is empty"})
         cap_max = spec.get("caption_max_chars")
         if cap_max and n > cap_max:
             weighted = " (emoji-weighted)" if spec.get("count_emoji_double") else ""
-            issues.append({"level": "hard", "msg": f"caption {n} chars{weighted} > limit {cap_max}"})
+            issues.append({"level": "hard",
+                           "msg": f"post {n} chars incl. hashtags{weighted} > limit {cap_max}"})
         cap_min = spec.get("caption_min_chars")
         if cap_min and n < cap_min:
             issues.append({"level": "soft", "msg": f"caption {n} chars < target {cap_min}"})

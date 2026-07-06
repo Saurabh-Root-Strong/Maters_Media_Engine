@@ -40,7 +40,10 @@ _EXTRACT_SCHEMA = {
 }
 
 
-def suggest(n: int = 6, use_search: bool | None = None) -> list[dict]:
+def suggest(n: int = 6, use_search: bool = True) -> list[dict]:
+    # "Trending" is meaningless without live data — a model-knowledge answer
+    # would present stale guesses as current. Search is always forced on.
+    use_search = True
     niche = (memory.brand_profile().get("niche")
              or "Indian stock markets, economy and policy")
     avoid = memory.recent_topics(20)

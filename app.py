@@ -11,6 +11,7 @@ all). Publishing is dry-run until MEDIA_ENGINE_LIVE=true + credentials.
 
 from __future__ import annotations
 
+import math
 import os
 import uuid
 
@@ -33,6 +34,12 @@ _OUT_DIR = os.path.join(os.path.dirname(__file__), "output")
 _RUNS: dict[str, dict] = {}
 
 scheduler.start()  # background thread that fires due scheduled posts
+
+
+def _body() -> dict:
+    """Parse the JSON body defensively — bad/missing JSON is {} not a 415."""
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else {}
 
 
 def _enforce(run: dict, platform: str, confirm: bool):
@@ -97,8 +104,8 @@ def output_file(name: str):
 
 @app.post("/api/generate")
 def api_generate():
-    body = request.json or {}
-    topic = body.get("topic", "").strip()
+    body = _body()
+    topic = str(body.get("topic") or "").strip()
     # .get(default) — not `or` — so an explicit [] means "none" (400), not "all".
     selected = body.get("platforms", ["twitter", "instagram", "linkedin"])
     selected = [p for p in selected if p in BY_KEY]
@@ -157,7 +164,7 @@ def api_generate():
 
 @app.post("/api/publish")
 def api_publish():
-    body = request.json or {}
+    body = _body()
     run_id = body.get("run_id")
     platform = body.get("platform")
     confirm = bool(body.get("confirm"))
@@ -175,7 +182,7 @@ def api_publish():
 def api_trending():
     if not llm.has_api_key():
         return jsonify({"error": f"{llm.key_var()} not set."}), 400
-    web_search = (request.json or {}).get("web_search")
+    web_search = _body().get("web_search")
     try:
         from engine import trending
         return jsonify({"topics": trending.suggest(6, use_search=web_search)})
@@ -185,7 +192,7 @@ def api_trending():
 
 @app.post("/api/schedule")
 def api_schedule():
-    body = request.json or {}
+    body = _body()
     run_id = body.get("run_id")
     platform = body.get("platform")
     confirm = bool(body.get("confirm"))
@@ -199,6 +206,10 @@ def api_schedule():
     try:
         when_epoch = float(when_epoch)
     except (TypeError, ValueError):
+        return jsonify({"error": "Invalid schedule time."}), 400
+    # NaN fails every comparison, so it would slip past the past-time check and
+    # sit pending forever; inf never comes due. Both must be rejected here.
+    if not math.isfinite(when_epoch):
         return jsonify({"error": "Invalid schedule time."}), 400
     if when_epoch <= time.time() + 5:
         return jsonify({"error": "Schedule time must be in the future."}), 400
@@ -215,7 +226,7 @@ def api_scheduled():
 
 @app.post("/api/scheduled/cancel")
 def api_scheduled_cancel():
-    jid = (request.json or {}).get("id")
+    jid = _body().get("id")
     return jsonify({"cancelled": scheduler.cancel(jid)})
 
 

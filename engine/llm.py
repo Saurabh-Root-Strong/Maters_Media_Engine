@@ -42,7 +42,10 @@ _WEB_SEARCH = os.environ.get("MEDIA_ENGINE_WEB_SEARCH", "on").strip().lower() no
 def web_search_enabled() -> bool:
     return _WEB_SEARCH
 
-_client = None
+# One cached client per provider — a single shared slot would hand back the
+# wrong client type if both providers get used in one process (e.g. tests).
+_openai_client = None
+_anthropic_client = None
 
 
 def key_var() -> str:
@@ -56,12 +59,12 @@ def has_api_key() -> bool:
 # =============================== OpenAI =====================================
 
 def _openai():
-    global _client
-    if _client is None:
+    global _openai_client
+    if _openai_client is None:
         from openai import OpenAI
         # max_retries covers transient 429/5xx/connection errors with backoff.
-        _client = OpenAI(max_retries=4, timeout=120.0)
-    return _client
+        _openai_client = OpenAI(max_retries=4, timeout=120.0)
+    return _openai_client
 
 
 def _openai_web(system: str, user: str, use_search: bool) -> str:
@@ -90,7 +93,11 @@ def _openai_structured(system: str, user: str, schema: dict) -> dict:
             "json_schema": {"name": "result", "strict": True, "schema": schema},
         },
     )
-    return json.loads(resp.choices[0].message.content)
+    content = resp.choices[0].message.content
+    if not content:  # refusal / filtered — surface a clear error, not a TypeError
+        refusal = getattr(resp.choices[0].message, "refusal", None)
+        raise RuntimeError(f"Model returned no structured output: {refusal or 'empty response'}")
+    return json.loads(content)
 
 
 # ============================= Anthropic ====================================
@@ -99,11 +106,11 @@ _WEB_SEARCH_TOOL = {"type": "web_search_20260209", "name": "web_search", "max_us
 
 
 def _anthropic():
-    global _client
-    if _client is None:
+    global _anthropic_client
+    if _anthropic_client is None:
         import anthropic
-        _client = anthropic.Anthropic()
-    return _client
+        _anthropic_client = anthropic.Anthropic()
+    return _anthropic_client
 
 
 def _anthropic_text(response) -> str:

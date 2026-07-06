@@ -64,9 +64,12 @@ def _render(result: dict) -> None:
 
     if result.get("image"):
         img = result["image"]
-        print(f"\n{_RULE}\nINSTAGRAM IMAGE")
+        print(f"\n{_RULE}\nIMAGE ({img.get('backend', 'template')})")
         print(f"  Saved: {os.path.abspath(img['path'])}")
-        print(f"  Headline: {img['spec']['headline']}")
+        if img.get("spec"):  # only the template backend produces a spec
+            print(f"  Headline: {img['spec']['headline']}")
+        if img.get("template"):
+            print(f"  Poster template: {img['template']}")
     elif result.get("image_error"):
         print(f"\n  ⚠ Image render failed: {result['image_error']}")
 

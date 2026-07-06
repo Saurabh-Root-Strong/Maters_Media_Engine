@@ -42,7 +42,11 @@ def _schema_for(spec: dict) -> dict:
 
 
 def _system_for(spec: dict) -> str:
-    limits = [f"Caption must be <= {spec['caption_max_chars']} characters."]
+    limits = [
+        f"Caption PLUS the hashtags (which get appended as '#tag #tag') must "
+        f"together fit within {spec['caption_max_chars']} characters — leave "
+        f"room for the hashtags."
+    ]
     if spec.get("caption_min_chars"):
         limits.append(f"Caption should be >= {spec['caption_min_chars']} characters.")
     limits.append(

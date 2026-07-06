@@ -17,8 +17,8 @@ def test_validate_catches_char_and_hashtag_limits():
     }
     v = validate(drafts)
     msgs = [i["msg"] for i in v["twitter"]]
-    assert any("300" in m and "280" in m for m in msgs)      # over char limit
-    assert any("outside [0,3]" in m for m in msgs)           # too many hashtags
+    assert any("incl. hashtags" in m and "280" in m for m in msgs)  # over char limit
+    assert any("outside [0,3]" in m for m in msgs)                  # too many hashtags
     hv = hard_violations(v)
     assert "twitter" in hv          # 4 hashtags is valid for instagram (3-5), so no IG hard-fail
     assert "instagram" not in hv
@@ -27,6 +27,14 @@ def test_validate_catches_char_and_hashtag_limits():
 def test_validate_empty_caption_is_hard():
     v = validate({"twitter": {"caption": "  ", "hashtags": []}})
     assert any(i["level"] == "hard" for i in v["twitter"])
+
+
+def test_validate_counts_hashtags_in_twitter_limit():
+    # caption alone fits 280, but caption + appended hashtags does not —
+    # the gate must measure the full outgoing post text.
+    v = validate({"twitter": {"caption": "x" * 270, "hashtags": ["StockMarket", "Nifty"]}})
+    msgs = [i["msg"] for i in v["twitter"] if i["level"] == "hard"]
+    assert any("incl. hashtags" in m and "280" in m for m in msgs)
 
 
 def test_linkedin_short_caption_is_soft_only():

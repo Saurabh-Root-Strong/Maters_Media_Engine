@@ -1,7 +1,8 @@
-"""Runs the v0 pipeline: topic -> research -> angle -> 3 drafts.
+"""The content pipeline: topic -> research -> angle -> drafts -> auto-revise ->
+review gate -> image.
 
-No image render, no safety gate, no publishing yet (those are v1-v4). Returns
-a single result dict so the CLI (or a future API) can render it however.
+Publishing is NOT here — the CLI/dashboard/autopost decide what to do with the
+returned result dict (drafts + review verdict + image).
 """
 
 from __future__ import annotations
