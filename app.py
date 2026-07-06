@@ -182,12 +182,19 @@ def api_publish():
 def api_trending():
     if not llm.has_api_key():
         return jsonify({"error": f"{llm.key_var()} not set."}), 400
-    web_search = _body().get("web_search")
+    category = str(_body().get("category") or "all")
     try:
         from engine import trending
-        return jsonify({"topics": trending.suggest(6, use_search=web_search)})
+        return jsonify({"topics": trending.suggest(category=category)})
     except Exception as exc:  # noqa: BLE001
         return jsonify({"error": f"Trending fetch failed: {exc}"}), 500
+
+
+@app.get("/api/trending/categories")
+def api_trending_categories():
+    from engine.trending import CATEGORIES
+    return jsonify({"categories": [{"id": k, "name": v["name"]}
+                                   for k, v in CATEGORIES.items()]})
 
 
 @app.post("/api/schedule")

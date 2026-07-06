@@ -27,6 +27,8 @@
     border-radius:9px; font-weight:600; cursor:pointer; font-size:15px; }
   .bar button:disabled { opacity:.5; cursor:default; }
   #trend { background:var(--panel2); color:var(--accent); border:1px solid var(--line); }
+  #trendcat { background:var(--panel); color:var(--ink); border:1px solid var(--line);
+    border-radius:9px; padding:0 10px; font-size:14px; max-width:230px; }
   .trendbox { margin-bottom:16px; display:flex; flex-direction:column; gap:8px; }
   .trendchip { text-align:left; background:var(--panel); border:1px solid var(--line);
     border-radius:9px; padding:10px 14px; cursor:pointer; color:var(--ink); }
@@ -99,6 +101,7 @@
 <main>
   <div class="bar">
     <input class="topic" id="topic" placeholder='e.g. "Iran-Iraq war"' autofocus>
+    <select id="trendcat" title="Which kind of trending stories to scout"></select>
     <button id="trend" title="Suggest current trending topics from your sources">🔥 Trending</button>
     <button id="go">Generate</button>
   </div>
@@ -316,7 +319,7 @@ async function loadTrending() {
   $("trend").disabled = true; $("trend").textContent = "🔎 Finding…";
   box.style.display = "block"; box.innerHTML = '<span style="color:var(--dim)">Scanning your sources for what\'s trending…</span>';
   try {
-    const d = await api("/api/trending", {web_search:$("websearch").checked});
+    const d = await api("/api/trending", {category:$("trendcat").value});
     box.innerHTML = "";
     for (const t of (d.topics||[])) {
       const el = document.createElement("div"); el.className = "trendchip";
@@ -331,6 +334,17 @@ async function loadTrending() {
     $("trend").disabled = false; $("trend").textContent = "🔥 Trending";
   }
 }
+
+async function loadTrendCats() {
+  try {
+    const d = await (await fetch("/api/trending/categories")).json();
+    const sel = $("trendcat");
+    for (const c of (d.categories||[])) {
+      const o = document.createElement("option"); o.value = c.id; o.textContent = c.name; sel.appendChild(o);
+    }
+  } catch(e) {}
+}
+loadTrendCats();
 
 $("trend").onclick = loadTrending;
 $("go").onclick = generate;
