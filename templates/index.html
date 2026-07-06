@@ -29,6 +29,9 @@
   #trend { background:var(--panel2); color:var(--accent); border:1px solid var(--line); }
   #trendcat { background:var(--panel); color:var(--ink); border:1px solid var(--line);
     border-radius:9px; padding:0 10px; font-size:14px; max-width:230px; }
+  .platsel { display:inline-flex; align-items:center; gap:6px; }
+  .fmt { background:var(--panel2); color:var(--ink); border:1px solid var(--line);
+    border-radius:7px; padding:5px 7px; font-size:13px; }
   .trendbox { margin-bottom:16px; display:flex; flex-direction:column; gap:8px; }
   .trendchip { text-align:left; background:var(--panel); border:1px solid var(--line);
     border-radius:9px; padding:10px 14px; cursor:pointer; color:var(--ink); }
@@ -108,11 +111,14 @@
   <div id="trendbox" class="trendbox" style="display:none"></div>
 
   <div class="controls">
-    <div class="group">
-      <label>Platforms</label>
-      <label class="chk"><input type="checkbox" class="plat" value="twitter" checked> Twitter/X</label>
-      <label class="chk"><input type="checkbox" class="plat" value="instagram" checked> Instagram</label>
-      <label class="chk"><input type="checkbox" class="plat" value="linkedin" checked> LinkedIn</label>
+    <div class="group" style="flex-wrap:wrap">
+      <label>Platforms &amp; template</label>
+      <span class="platsel"><label class="chk"><input type="checkbox" class="plat" value="twitter" checked> Twitter/X</label>
+        <select class="fmt" data-plat="twitter"></select></span>
+      <span class="platsel"><label class="chk"><input type="checkbox" class="plat" value="instagram" checked> Instagram</label>
+        <select class="fmt" data-plat="instagram"></select></span>
+      <span class="platsel"><label class="chk"><input type="checkbox" class="plat" value="linkedin" checked> LinkedIn</label>
+        <select class="fmt" data-plat="linkedin"></select></span>
     </div>
     <div class="group">
       <label>When</label>
@@ -168,6 +174,11 @@ async function api(path, body) {
 function esc(s){ return (s||"").replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
 
 function selectedPlatforms(){ return [...document.querySelectorAll(".plat:checked")].map(c=>c.value); }
+function formatsMap(){
+  const m = {};
+  for (const sel of document.querySelectorAll(".fmt")) if (sel.value) m[sel.dataset.plat] = sel.value;
+  return m;
+}
 function scheduleSpec(){
   if ($("when-mode").value !== "schedule") return {mode:"now"};
   const v = $("when-time").value;
@@ -187,7 +198,7 @@ async function generate() {
   $("err").style.display="none"; $("searchnote").style.display="none"; $("out").innerHTML="";
   $("go").disabled=true; $("spin").style.display="block";
   try {
-    const d = await api("/api/generate", {topic, platforms:plats,
+    const d = await api("/api/generate", {topic, platforms:plats, formats:formatsMap(),
       web_search:ws, image_backend:$("imgbackend").value, image_template:$("imgtemplate").value});
     RUN = d.run_id; render(d);
     if (!ws) $("searchnote").style.display="block";
@@ -308,6 +319,13 @@ async function loadConfig() {
     if (c.image_templates && c.image_templates.length) {
       const sel = $("imgtemplate");
       for (const t of c.image_templates) {
+        const o = document.createElement("option"); o.value = t.id; o.textContent = t.name; sel.appendChild(o);
+      }
+    }
+    const pt = c.platform_templates || {};
+    for (const sel of document.querySelectorAll(".fmt")) {
+      const opts = pt[sel.dataset.plat] || [];
+      for (const t of opts) {
         const o = document.createElement("option"); o.value = t.id; o.textContent = t.name; sel.appendChild(o);
       }
     }

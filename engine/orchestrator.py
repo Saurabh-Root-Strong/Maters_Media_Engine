@@ -23,7 +23,8 @@ def _slug(topic: str) -> str:
 
 def run(topic: str, platforms_selected: list[str] | None = None,
         use_search: bool | None = None, image_backend: str | None = None,
-        image_template: str | None = None, on_progress=None) -> dict:
+        image_template: str | None = None, formats_map: dict | None = None,
+        on_progress=None) -> dict:
     def note(msg: str) -> None:
         if on_progress:
             on_progress(msg)
@@ -36,15 +37,17 @@ def run(topic: str, platforms_selected: list[str] | None = None,
 
     platforms = _load_platforms()
 
+    formats_map = formats_map or {}
     note("Drafting selected platforms...")
-    drafts = drafters.draft_all(brief, angle, platforms_selected)
+    drafts = drafters.draft_all(brief, angle, platforms_selected, formats_map)
 
-    # Auto-revise: one re-draft per platform that breaks a hard limit.
+    # Auto-revise: one re-draft per platform that breaks a hard limit (same template).
     violations = review.hard_violations(review.validate(drafts, platforms))
     if violations:
         note(f"Auto-revising: {', '.join(violations)}...")
         for key, issues in violations.items():
-            drafts[key] = drafters.redraft(key, platforms[key], brief, angle, issues)
+            drafts[key] = drafters.redraft(key, platforms[key], brief, angle, issues,
+                                           fmt_id=formats_map.get(key))
 
     note("Reviewing (limits + facts + sensitivity)...")
     gate = review.review(brief, angle, drafts, platforms)

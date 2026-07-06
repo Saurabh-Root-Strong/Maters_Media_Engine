@@ -23,6 +23,34 @@ def _load_platforms() -> dict:
         return yaml.safe_load(f)
 
 
+def _formats(spec: dict) -> list[dict]:
+    """Template options for a platform. Supports the new `formats` list and the
+    legacy single `format` string."""
+    fmts = spec.get("formats")
+    if isinstance(fmts, list) and fmts:
+        return fmts
+    if spec.get("format"):
+        return [{"id": "default", "name": "Default", "template": spec["format"]}]
+    return []
+
+
+def _format_text(spec: dict, fmt_id: str | None) -> str:
+    """The chosen template's text (default = first) or '' if none."""
+    fmts = _formats(spec)
+    if not fmts:
+        return ""
+    chosen = next((f for f in fmts if f.get("id") == fmt_id), fmts[0])
+    return (chosen.get("template") or "").strip()
+
+
+def platform_templates() -> dict:
+    """{platform: [{id, name}]} for the dashboard pickers."""
+    return {
+        key: [{"id": f.get("id"), "name": f.get("name", f.get("id"))} for f in _formats(spec)]
+        for key, spec in _load_platforms().items()
+    }
+
+
 def _schema_for(spec: dict) -> dict:
     props = {
         "caption": {"type": "string"},
@@ -41,7 +69,7 @@ def _schema_for(spec: dict) -> dict:
     }
 
 
-def _system_for(spec: dict) -> str:
+def _system_for(spec: dict, fmt_id: str | None = None) -> str:
     limits = [
         f"Caption PLUS the hashtags (which get appended as '#tag #tag') must "
         f"together fit within {spec['caption_max_chars']} characters — leave "
@@ -59,7 +87,7 @@ def _system_for(spec: dict) -> str:
             " graphic (readable headline text over a fitting background), and"
             " alt_text describing it."
         )
-    fmt = (spec.get("format") or "").strip()
+    fmt = _format_text(spec, fmt_id)
     format_block = (
         f"\n\nFORMAT — follow this exact structure/style, it overrides the "
         f"general style above:\n{fmt}\n"
@@ -76,16 +104,18 @@ def _system_for(spec: dict) -> str:
     )
 
 
-def draft_one(platform: str, spec: dict, brief: dict, angle: dict) -> dict:
+def draft_one(platform: str, spec: dict, brief: dict, angle: dict,
+              fmt_id: str | None = None) -> dict:
     user = (
         "ANGLE:\n" + json.dumps(angle, indent=2)
         + "\n\nBRIEF:\n" + json.dumps(brief, indent=2)
         + f"\n\nWrite the {spec['label']} post now."
     )
-    return llm.structured(_system_for(spec), user, _schema_for(spec), max_tokens=3000)
+    return llm.structured(_system_for(spec, fmt_id), user, _schema_for(spec), max_tokens=3000)
 
 
-def redraft(platform: str, spec: dict, brief: dict, angle: dict, issues: list[str]) -> dict:
+def redraft(platform: str, spec: dict, brief: dict, angle: dict, issues: list[str],
+            fmt_id: str | None = None) -> dict:
     """Re-draft one platform with reviewer issues fed back in (auto-revise)."""
     user = (
         "ANGLE:\n" + json.dumps(angle, indent=2)
@@ -94,12 +124,13 @@ def redraft(platform: str, spec: dict, brief: dict, angle: dict, issues: list[st
         + "\n- ".join(issues)
         + f"\n\nRewrite the {spec['label']} post, keeping everything else good."
     )
-    draft = llm.structured(_system_for(spec), user, _schema_for(spec), max_tokens=3000)
+    draft = llm.structured(_system_for(spec, fmt_id), user, _schema_for(spec), max_tokens=3000)
     _apply_fixed(draft, spec)
     return draft
 
 
-def draft_all(brief: dict, angle: dict, selected: list[str] | None = None) -> dict:
+def draft_all(brief: dict, angle: dict, selected: list[str] | None = None,
+              formats_map: dict | None = None) -> dict:
     """Draft all selected platforms in ONE call (cheaper than one call each).
 
     A combined schema returns a draft per platform; each platform's own style +
@@ -109,6 +140,7 @@ def draft_all(brief: dict, angle: dict, selected: list[str] | None = None) -> di
     platforms = _load_platforms()
     if selected:
         platforms = {k: v for k, v in platforms.items() if k in selected}
+    formats_map = formats_map or {}
 
     props = {key: _schema_for(spec) for key, spec in platforms.items()}
     schema = {
@@ -119,7 +151,7 @@ def draft_all(brief: dict, angle: dict, selected: list[str] | None = None) -> di
     }
 
     rule_blocks = "\n\n".join(
-        f"=== {spec['label']} (key: {key}) ===\n{_system_for(spec)}"
+        f"=== {spec['label']} (key: {key}) ===\n{_system_for(spec, formats_map.get(key))}"
         for key, spec in platforms.items()
     )
     system = (

@@ -58,7 +58,7 @@ def test_generate_happy_path_mocked(client, monkeypatch):
     }
     monkeypatch.setattr(app_module.orchestrator, "run",
                         lambda topic, platforms_selected=None, use_search=None,
-                        image_backend=None, image_template=None: fake)
+                        image_backend=None, image_template=None, formats_map=None: fake)
     r = client.post("/api/generate", json={"topic": "monsoon", "platforms": ["twitter"]})
     d = r.get_json()
     assert r.status_code == 200
