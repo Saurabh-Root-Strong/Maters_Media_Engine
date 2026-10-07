@@ -17,6 +17,7 @@ import threading
 import time
 import uuid
 
+from . import analytics
 from .publishers import BY_KEY
 
 _DIR = os.path.join(os.path.dirname(__file__), "..", "output", "scheduled")
@@ -53,6 +54,13 @@ class Scheduler:
                         job = json.load(f)
                     # Terminal jobs stay on disk as the audit trail but don't
                     # belong in memory — only pending/error can still act.
+                    if job.get("status") == "firing":
+                        # The app died mid-fire: the post may or may not have
+                        # gone out. Never re-fire on a guess — surface it.
+                        job["status"] = "error"
+                        job["detail"] = ("interrupted mid-fire — check the platform "
+                                         "before re-posting")
+                        self._save(job)
                     if job.get("status") in ("pending", "error"):
                         self._jobs[job["id"]] = job
                 except Exception:  # noqa: BLE001 — skip a corrupt job file
@@ -60,8 +68,9 @@ class Scheduler:
 
     # --- api ---
     def add(self, platform: str, when_epoch: float, when_label: str,
-            frozen: dict, live: bool) -> dict:
+            frozen: dict, live: bool, meta: dict | None = None) -> dict:
         job = {
+            "meta": meta or {},   # trend state / format at generation, for analytics
             "id": uuid.uuid4().hex[:12],
             "platform": platform,
             "topic": frozen.get("topic", ""),
@@ -85,8 +94,10 @@ class Scheduler:
 
     def cancel(self, jid: str) -> bool:
         with self._lock:
-            job = self._jobs.get(jid)
-            if not job or job["status"] != "pending":
+            job = self._jobs.get(jid) if isinstance(jid, str) else None
+            # error jobs are cancellable too — otherwise a failed job sits in
+            # the panel forever and is reloaded on every restart.
+            if not job or job["status"] not in ("pending", "error"):
                 return False
             job["status"] = "cancelled"
             self._save(job)
@@ -104,6 +115,12 @@ class Scheduler:
             job["detail"] = res.get("url") or res.get("reason") or res.get("status", "")
         except Exception as exc:  # noqa: BLE001
             job["status"], job["detail"] = "error", str(exc)
+            return
+        try:  # log to analytics.db; a logging failure must not fail the post
+            analytics.record_post(job["platform"], job["frozen"], res, job.get("meta"),
+                                  scheduled=True)
+        except Exception:  # noqa: BLE001
+            pass
 
     def _tick(self) -> None:
         now = time.time()
@@ -112,6 +129,9 @@ class Scheduler:
                    if j["status"] == "pending" and j["when_epoch"] <= now]
             for job in due:
                 job["status"] = "firing"  # claim it so a slow fire can't double-run
+                # Persist the claim: if the process dies mid-fire, disk must not
+                # still say "pending" or the restart would post it twice.
+                self._save(job)
         for job in due:
             self._fire(job)
             with self._lock:

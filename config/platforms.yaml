@@ -110,7 +110,7 @@ twitter:
   caption_max_chars: 280
   count_emoji_double: true
   hashtags_min: 0
-  hashtags_max: 3
+  hashtags_max: 2   # hashtags no longer add reach on X (see config/algorithms.yaml)
   needs_image: false
 
 linkedin:
@@ -207,6 +207,6 @@ linkedin:
         [2-3 reflective closing lines]
   caption_max_chars: 3000
   caption_min_chars: 1200
-  hashtags_min: 5
-  hashtags_max: 10
+  hashtags_min: 3   # hashtags stopped driving LinkedIn distribution; 3-5 labels the topic
+  hashtags_max: 5
   needs_image: true

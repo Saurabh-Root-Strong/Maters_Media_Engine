@@ -1,0 +1,112 @@
+# What each platform's ranking system rewards — and how the engine acts on it.
+#
+# Nobody outside these companies knows the full algorithm. Every rule below is
+# tagged with how solid it is:
+#   official   stated by the platform itself (executive, policy page, eng blog)
+#   code       visible in ranking code the platform published
+#   reported   consistently measured/reported by third parties, not confirmed
+#   heuristic  plain good practice; no ranking claim
+# Algorithms change every few months — re-check and edit. Reviewed: 2026-10-06.
+#
+# write_rules  -> injected into the drafting prompt for that platform
+# checks       -> run by code on every draft (engine/algo.py); shown as the
+#                 "Algorithm fit" score on each card. Advisory, never blocks.
+#                 weight = how much a check counts toward the 0-100 score.
+# advice       -> shown under the score; things a text draft cannot fix
+
+twitter:
+  optimises_for: >
+    Conversation and time spent. In X's published ranking weights a reply the
+    author answers back counts far more than a like; long reads count too.
+    Posts with outside links are held back.
+  write_rules:
+    - Do NOT put any URL in the post. The source link goes in a reply underneath.
+    - End on a specific, answerable question that invites a reply — never "thoughts?".
+    - First sentence is the hook - a concrete number or claim, under ~100 characters.
+    - Use at most 2 hashtags; none is fine. Never stack hashtags.
+    - No engagement bait ("like if", "RT if", "follow for more").
+    - Calm, constructive tone - no outrage framing.
+  checks:
+    no_link:        {weight: 25, basis: reported, why: "Posts with outside links get markedly less reach on X. Put the link in a reply."}
+    asks_question:  {weight: 20, basis: code,     why: "Replies - and you replying back - are the heaviest signals in X's published weights."}
+    max_hashtags:   {weight: 10, basis: reported, limit: 2, why: "Hashtags no longer add reach on X; more than two reads as spam."}
+    hook_chars:     {weight: 10, basis: heuristic, limit: 110, why: "The first sentence decides whether anyone stops scrolling."}
+    min_chars:      {weight: 10, basis: code,     limit: 120, why: "Time spent reading is a positive signal; a one-liner gives it nothing to measure."}
+    no_bait:        {weight: 15, basis: heuristic, why: "Engagement bait is filtered as low quality."}
+    max_mentions:   {weight: 5,  basis: heuristic, limit: 2, why: "Tagging many accounts looks like spam."}
+    no_shouting:    {weight: 5,  basis: heuristic, why: "ALL-CAPS runs read as spam."}
+  advice:
+    - Reply to every comment in the first hour - an author reply is the single strongest signal.
+    - Speed matters most here. Post while the topic is Rising; a peaked topic is already old on X.
+    - Attach the image or a chart - media posts hold attention longer than text alone.
+  first_comment: true
+
+linkedin:
+  optimises_for: >
+    Reading time and real conversation among relevant professionals. LinkedIn's
+    engineers have written that dwell time ranks above quick likes; saves and
+    multi-sentence comments are the strongest spread signals. Hashtags no
+    longer drive distribution.
+  write_rules:
+    - Do NOT put any URL in the post body. The source link goes in the first comment.
+    - The first line must work alone - it is all that shows before "…see more". Keep it under ~140 characters and make it specific.
+    - Write for reading time - short lines, white space, concrete numbers. Depth beats brevity here.
+    - End with one genuine question a professional would answer in a sentence or two.
+    - 3 to 5 hashtags at most. They label the topic; they do not add reach.
+    - No engagement bait ("comment YES", "agree?", "repost if").
+    - Stay on the brand's subject - the ranking model matches posts to people by topic expertise.
+  checks:
+    no_link:        {weight: 20, basis: reported, why: "Posts built to send people off LinkedIn get less reach. Put the link in the first comment."}
+    hook_chars:     {weight: 15, basis: heuristic, limit: 140, why: "Only the first line shows before “…see more”."}
+    depth_chars:    {weight: 15, basis: official, limit: 900,  why: "Reading time is a core ranking signal; thin posts give nothing to dwell on."}
+    line_breaks:    {weight: 10, basis: heuristic, limit: 8,   why: "Walls of text get abandoned, which cuts reading time."}
+    asks_question:  {weight: 15, basis: reported, why: "Thoughtful comments are the most valuable engagement on LinkedIn."}
+    max_hashtags:   {weight: 10, basis: reported, limit: 5, why: "Hashtags stopped driving distribution; a long tail of them reads as dated."}
+    no_bait:        {weight: 10, basis: official, why: "LinkedIn says it demotes posts that ask for likes or comments."}
+    max_mentions:   {weight: 5,  basis: heuristic, limit: 3, why: "Tag only people who will actually respond."}
+  advice:
+    - Reply to comments within the first hour with full sentences - it extends the conversation the ranking sees.
+    - A PDF carousel (document post) of the same story typically out-engages a single image; each swipe adds reading time.
+    - Saves are a top signal - give something worth keeping (a number table, a checklist, a framework).
+  first_comment: true
+
+instagram:
+  optimises_for: >
+    Instagram's head has named the three signals - watch time, sends per reach
+    (shares by direct message) and likes per reach. Sends matter most for
+    reaching non-followers. Hashtags are capped at five and, by the company's
+    own word, do not improve reach. Original content is rewarded; reposts are
+    removed from recommendations.
+  write_rules:
+    - The first line is the hook - under ~125 characters, before the "more" cut.
+    - Make it worth sending to a friend - one clear, useful takeaway an investor would forward.
+    - At most 5 hashtags (hard platform limit). Specific beats broad.
+    - No URLs - links are not clickable in captions.
+    - No engagement bait ("tag a friend", "like if you agree", "comment YES") - Meta detects and suppresses it.
+  checks:
+    max_hashtags:   {weight: 20, basis: official, limit: 5, why: "Instagram enforces a five-hashtag limit and says hashtags do not improve reach."}
+    hook_chars:     {weight: 15, basis: heuristic, limit: 125, why: "The caption is cut after about 125 characters."}
+    no_bait:        {weight: 25, basis: official, why: "Meta's engagement-bait classifier suppresses reach immediately."}
+    no_link:        {weight: 10, basis: official, why: "Caption links are not clickable - wasted space."}
+    max_mentions:   {weight: 20, basis: heuristic, limit: 3, why: "A row of @mentions of accounts not in the story reads as tag-spam."}
+    no_shouting:    {weight: 10, basis: heuristic, why: "ALL-CAPS runs read as spam."}
+  advice:
+    - A single static image is Instagram's weakest format. Watch time is the top signal - a Reel or a swipeable carousel of the same story reaches further.
+    - Sends per reach is what breaks out to non-followers - ask yourself "would someone forward this?".
+    - Post only original visuals; recycled or watermarked content is dropped from recommendations.
+  first_comment: false
+
+# How the angle should change with where the topic is in its life.
+trend_angles:
+  EMERGING: >
+    This story is new and barely covered. Be first and plain - say what
+    happened and why it matters. Do not over-claim; the facts are still thin.
+  RISING: >
+    This story is gaining attention fast. Give the sharp, timely take - the
+    "so what for investors" that the first wave of headlines has not made yet.
+  PEAKING: >
+    Everyone has already posted the headline. The basic take is worthless
+    now - find the contrarian, second-order, or who-really-benefits angle.
+  FADING: >
+    Attention is moving on. Do not rehash it - write the "what happens next"
+    or the lesson that outlasts the news.

@@ -105,7 +105,9 @@ def _fresh_enough(date_str: str) -> bool:
         d = datetime.strptime(date_str.strip()[:10], "%Y-%m-%d").replace(tzinfo=_IST)
     except ValueError:
         return False
-    return (_today() - d).days <= MAX_AGE_DAYS
+    # A date in the future is a hallucination, not a fresh story (1 day of
+    # slack for timezone skew between the source and IST).
+    return -1 <= (_today() - d).days <= MAX_AGE_DAYS
 
 
 def suggest(n: int | None = None, use_search: bool = True,

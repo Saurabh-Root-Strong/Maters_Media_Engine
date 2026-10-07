@@ -100,20 +100,83 @@ _DISTILL_SYSTEM = (
 )
 
 
+_OFFLINE_SYSTEM = (
+    "You are a markets researcher writing research notes WITHOUT web access. You "
+    "have no search tool — do not try to call one.\n"
+    "You are given real headlines collected from Indian business news in the last "
+    "few days. Treat them as the only current facts you have:\n"
+    "- Build the notes from what the headlines state. Quote figures, names and "
+    "dates exactly as the headlines give them.\n"
+    "- A headline is one line, not an article: do not add details it does not "
+    "contain, and do not guess the numbers behind it.\n"
+    "- You may add short background from general knowledge (what a company does, "
+    "how a mechanism works), clearly under a BACKGROUND heading, never as news.\n"
+    "- If the headlines disagree, say so. If there are few or none, say the "
+    "coverage is thin rather than filling the gap.\n"
+    "Return dense notes: the facts, the angle outlets are leading with, the words "
+    "recurring across coverage, the sentiment, then every source URL given."
+)
+
+
+def _collected_headlines(topic: str) -> str:
+    """What the trend tracker already holds on this topic — real and current,
+    and free. '' if the store has nothing or cannot be read."""
+    try:
+        from .trends import insight
+        ev = insight.analyse(topic)
+    except Exception:  # noqa: BLE001 — research must still run without the tracker
+        return ""
+    lines = [f"- {datetime.fromtimestamp(h['at'], _IST):%d %b %H:%M} | {h['publisher']} | "
+             f"{h['title']} | {h['url']}" for h in ev.get("headlines", [])]
+    lines += [f"- video, {v['views']:,} views | {v['channel']} | {v['title']} | {v['url']}"
+              for v in ev.get("videos", [])[:4]]
+    if not lines:
+        return ""
+    return (f"{ev.get('matched', len(lines))} related items from {ev.get('publishers', 0)} publishers; "
+            "the most recent:\n" + "\n".join(lines))
+
+
 def gather(topic: str, use_search: bool | None = None) -> str:
-    return llm.run_with_web_search(
-        _gather_system(),
-        f"Topic: {topic}\n\nResearch what is trending about this now.",
-        use_search=use_search,
-    )
+    live = llm.web_search_enabled() if use_search is None else bool(use_search)
+    if live:
+        return llm.run_with_web_search(
+            _gather_system(),
+            f"Topic: {topic}\n\nResearch what is trending about this now.",
+            use_search=True,
+        )
+    # Search off: never send the "search the web" prompt with no search tool —
+    # a model that takes it literally tries to call a tool it was not given and
+    # returns nothing. Ground the notes in headlines already collected instead.
+    headlines = _collected_headlines(topic)
+    today = datetime.now(_IST)
+    user = (f"TODAY IS {today:%d %B %Y} (IST).\nTopic: {topic}\n\n"
+            + (f"COLLECTED HEADLINES:\n{headlines}" if headlines else
+               "COLLECTED HEADLINES: none found for this topic. Say plainly that no current "
+               "coverage was available and give background only.")
+            + "\n\nWrite the research notes.")
+    return llm.run_with_web_search(_OFFLINE_SYSTEM, user, use_search=False)
+
+
+_NO_FLAG = {"", "none", "n/a", "na", "nil", "no", "null", "-"}
 
 
 def distill(notes: str) -> dict:
-    return llm.structured(
+    brief = llm.structured(
         _DISTILL_SYSTEM, f"Research notes:\n\n{notes}", _BRIEF_SCHEMA
     )
+    # The model sometimes writes ["None"] instead of []; any non-empty list
+    # marks the run sensitive and holds every platform, so drop the placeholders.
+    brief["sensitivity_flags"] = [
+        f for f in brief.get("sensitivity_flags", [])
+        if str(f).strip().lower().rstrip(".") not in _NO_FLAG
+    ]
+    return brief
 
 
 def research(topic: str, use_search: bool | None = None) -> dict:
     """Topic -> structured brief dict."""
-    return distill(gather(topic, use_search))
+    notes = gather(topic, use_search)
+    if not notes.strip():
+        # Distilling nothing makes the model invent a brief from thin air.
+        raise RuntimeError("research returned no notes — try again or rephrase the topic")
+    return distill(notes)

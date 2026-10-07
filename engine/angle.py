@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-from . import llm, memory
+from . import algo, llm, memory
 
 _SYSTEM = (
     "You are a content strategist. Given a research brief, pick the single most "
@@ -36,8 +36,10 @@ _SCHEMA = {
 }
 
 
-def choose(brief: dict) -> dict:
+def choose(brief: dict, trend_state: str | None = None) -> dict:
+    """trend_state (from the trend board) shifts the angle: the take that works
+    on a rising story is worthless once everyone has posted the headline."""
     return llm.structured(
-        _SYSTEM + memory.brand_block(),
+        _SYSTEM + algo.trend_hint(trend_state) + memory.brand_block(),
         "Research brief:\n\n" + json.dumps(brief, indent=2), _SCHEMA,
     )

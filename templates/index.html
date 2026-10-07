@@ -19,7 +19,153 @@
   header .sub { color:var(--dim); font-size:13px; }
   .mode { margin-left:auto; font-size:12px; color:var(--dim); }
   .mode b { color:var(--accent); }
-  main { max-width:1100px; margin:0 auto; padding:24px 28px 60px; }
+  /* --- app shell: left nav + pages --- */
+  html { color-scheme:dark; }
+  .shell { display:grid; grid-template-columns:216px minmax(0,1fr); gap:26px; max-width:1640px;
+    margin:0 auto; padding:22px 28px 60px; align-items:start; }
+  main { min-width:0; }
+  #nav { position:sticky; top:16px; display:flex; flex-direction:column; gap:6px; }
+  .navbtn { display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:11px 13px;
+    background:transparent; color:var(--dim); border:1px solid transparent; border-radius:10px;
+    cursor:pointer; font-size:14.5px; font-weight:600; }
+  .navbtn:hover { background:var(--panel); color:var(--ink); }
+  .navbtn.on { background:var(--panel); border-color:var(--line); color:var(--accent); }
+  .navbtn .ico { width:20px; text-align:center; }
+  .navbtn .pill { margin-left:auto; font-size:11px; font-weight:700; padding:1px 7px; border-radius:10px;
+    background:var(--ok); color:#fff; }
+  .navnote { color:var(--dim); font-size:11.5px; padding:10px 13px 0; line-height:1.5; }
+  .view { display:none; min-width:0; }
+  .view.on { display:block; }
+  @media (max-width:900px) {
+    .shell { grid-template-columns:1fr; padding:14px; gap:14px; }
+    #nav { position:static; flex-direction:row; flex-wrap:wrap; }
+    .navbtn { width:auto; } .navnote { display:none; }
+  }
+  /* --- algorithm fit on a draft card --- */
+  .fit { margin-top:10px; border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:12.5px; }
+  .fit summary { cursor:pointer; color:var(--dim); }
+  .fit summary b { font-size:13.5px; }
+  .fitrow { display:flex; gap:8px; margin-top:6px; line-height:1.45; }
+  .fitrow > span { font-weight:700; flex:none; }
+  .fitnote { color:var(--dim); margin-top:6px; line-height:1.5; }
+  .fitnote ul { margin:4px 0 0; padding-left:18px; }
+  /* --- content generator page --- */
+  .cg-form { display:grid; grid-template-columns:1fr 1fr; gap:12px 16px; }
+  .cg-form .wide { grid-column:1 / -1; }
+  .cg-form label { display:block; color:var(--dim); font-size:12.5px; margin-bottom:5px; }
+  .cg-form select, .cg-in { width:100%; background:var(--panel2); color:var(--ink);
+    border:1px solid var(--line); border-radius:8px; padding:10px 12px; font:inherit; font-size:14.5px; }
+  .cg-out { display:grid; grid-template-columns:minmax(0,5fr) minmax(0,7fr); gap:18px; margin-top:18px; align-items:start; }
+  .cg-out.single { grid-template-columns:1fr; }
+  @media (max-width:1100px) { .cg-out { grid-template-columns:1fr; } .cg-form { grid-template-columns:1fr; } }
+  .cg-box { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 18px; }
+  .cg-box h3 { margin:0 0 10px; font-size:16px; }
+  .cg-sec { margin-top:16px; }
+  .cg-sec h4 { margin:0 0 6px; font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:var(--dim);
+    display:flex; align-items:center; gap:8px; }
+  .cg-read { font-size:15px; line-height:1.5; }
+  .cg-line { display:flex; gap:10px; padding:6px 0; border-bottom:1px solid var(--line); font-size:13.5px; line-height:1.4; }
+  .cg-line:last-child { border-bottom:none; }
+  .cg-line .num { color:var(--accent); font-weight:700; white-space:nowrap; min-width:74px; }
+  .cg-chip { display:inline-block; background:var(--panel2); border:1px solid var(--line); border-radius:16px;
+    padding:3px 11px; margin:3px 5px 0 0; font-size:13px; }
+  .cg-item { border:1px solid var(--line); border-radius:9px; padding:10px 12px; margin-top:8px; background:var(--bg); }
+  .cg-item .txt { font-size:15px; font-weight:600; line-height:1.4; }
+  .cg-pre { white-space:pre-wrap; font-size:14px; line-height:1.55; border:1px solid var(--line); border-radius:9px;
+    padding:12px; background:var(--bg); max-height:420px; overflow:auto; }
+  .copy { background:transparent; border:1px solid var(--line); color:var(--dim); border-radius:6px;
+    padding:2px 9px; cursor:pointer; font-size:11.5px; text-transform:none; letter-spacing:0; }
+  .copy:hover { color:var(--accent); border-color:var(--accent); }
+  /* --- periodic update page --- */
+  .urow { display:flex; gap:10px; align-items:flex-start; padding:9px 4px; border-bottom:1px solid var(--line);
+    cursor:pointer; font-size:14px; line-height:1.4; }
+  .urow:last-child { border-bottom:none; }
+  .urow:hover { background:var(--bg); }
+  .urow .lab { flex:1; }
+  .move { font-size:11px; padding:1px 7px; border-radius:5px; border:1px solid var(--line);
+    color:var(--dim); white-space:nowrap; margin-top:4px; display:inline-block; }
+  .move.fresh { color:#58a6ff; border-color:#58a6ff; }
+  .move.upm { color:var(--ok); border-color:var(--ok); } .move.downm { color:var(--bad); border-color:var(--bad); }
+  .col.c-TRENDING{border-top-color:var(--ok);} .col.c-SAME{border-top-color:var(--warn);}
+  .st-TRENDING{color:var(--ok);} .st-SAME{color:var(--warn);}
+  @media (max-width:900px) { #up-board { grid-template-columns:1fr !important; } }
+  /* --- creator pulse --- */
+  .pulse { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:16px; }
+  .pulse h3 { margin:0 0 4px; font-size:16px; }
+  .pulse .rows2 { display:grid; grid-template-columns:repeat(auto-fill,minmax(420px,1fr)); gap:8px 18px; margin-top:10px; }
+  .prow { display:flex; gap:10px; align-items:flex-start; padding:7px 4px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .prow:hover { background:var(--bg); }
+  .prow .x { font-weight:700; min-width:52px; text-align:right; }
+  .prow .t { flex:1; font-size:13.5px; line-height:1.4; }
+  /* --- 1 day / 2 days switch --- */
+  .seg { display:inline-flex; border:1px solid var(--line); border-radius:9px; overflow:hidden; }
+  .seg button { background:var(--panel2); color:var(--dim); border:none; padding:8px 14px; cursor:pointer;
+    font-size:13.5px; font-weight:600; }
+  .seg button + button { border-left:1px solid var(--line); }
+  .seg button.on { background:var(--accent); color:#111; }
+  .tagc { font-size:10.5px; padding:1px 6px; border-radius:5px; border:1px solid var(--ok); color:var(--ok); margin-left:4px; }
+  /* --- page header --- */
+  .pagehead { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:6px; }
+  .pagehead h2 { margin:0; font-size:22px; }
+  .pagehead .grow { flex:1; }
+  .pagesub { color:var(--dim); font-size:13px; margin-bottom:16px; }
+  .tp-btn { background:var(--panel2); color:var(--ink); border:1px solid var(--line);
+    border-radius:8px; padding:8px 14px; cursor:pointer; font-size:13.5px; font-weight:600; }
+  .tp-btn:hover { border-color:var(--accent); }
+  .tp-btn:disabled { opacity:.5; cursor:default; }
+  .tp-btn.gold { background:var(--accent); color:#111; border-color:var(--accent); }
+  .tp-warn { background:#2a2410; border:1px solid var(--warn); color:#e8cf8a; border-radius:9px;
+    padding:10px 14px; font-size:13px; margin-bottom:12px; }
+  /* --- trending board: one column per lifecycle state --- */
+  .board { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; align-items:start; }
+  .board.five { grid-template-columns:repeat(5,minmax(0,1fr)); }
+  @media (max-width:1250px) { .board, .board.five { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media (max-width:640px) { .board, .board.five { grid-template-columns:1fr; } }
+  .col { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px;
+    border-top:3px solid var(--line); }
+  .col.c-EMERGING{border-top-color:#58a6ff;} .col.c-RISING{border-top-color:var(--ok);}
+  .col.c-PEAKING{border-top-color:var(--warn);} .col.c-FADING{border-top-color:var(--bad);}
+  .col h3 { margin:0; font-size:16px; display:flex; align-items:baseline; gap:8px; }
+  .col h3 .n { color:var(--dim); font-size:13px; font-weight:400; }
+  .col .hint { color:var(--dim); font-size:12.5px; margin:5px 0 12px; line-height:1.45; min-height:36px; }
+  .tcard { border:1px solid var(--line); border-radius:10px; padding:11px 12px; margin-bottom:10px;
+    background:var(--bg); cursor:pointer; }
+  .tcard:hover { border-color:var(--accent); }
+  .tcard .top { display:flex; gap:10px; align-items:flex-start; }
+  .tcard .label { flex:1; font-size:14px; line-height:1.4; font-weight:600; }
+  .tp-vel { font-size:13px; font-weight:700; white-space:nowrap; }
+  .up{color:var(--ok);} .down{color:var(--bad);} .flat{color:var(--dim);}
+  .tcard .tmeta { display:flex; align-items:center; gap:6px; margin-top:8px; flex-wrap:wrap; }
+  .src { font-size:11px; padding:1px 7px; border-radius:5px; border:1px solid var(--line); color:var(--dim); }
+  .src.multi { color:var(--accent); border-color:var(--accent); }
+  .tp-sig { color:var(--dim); font-size:12.5px; margin-top:7px; line-height:1.5; }
+  .tp-sig a { color:var(--dim); }
+  .tcard .use { margin-top:9px; font-size:12.5px; color:var(--accent); font-weight:600; }
+  .more { width:100%; background:transparent; border:1px dashed var(--line); color:var(--dim);
+    border-radius:9px; padding:8px; cursor:pointer; font-size:12.5px; }
+  .tp-empty { color:var(--dim); padding:18px 4px; text-align:center; font-size:13px; }
+  .health { display:flex; gap:22px; flex-wrap:wrap; color:var(--dim); font-size:12.5px; margin-top:18px;
+    padding:12px 16px; background:var(--panel); border:1px solid var(--line); border-radius:10px; }
+  .health .bad { color:var(--bad); } .health .ok { color:var(--ok); }
+  .st-EMERGING{color:#58a6ff;} .st-RISING{color:var(--ok);} .st-PEAKING{color:var(--warn);}
+  .st-FADING{color:var(--bad);} .st-WATCH{color:var(--dim);}
+  /* --- quick strip on the create page --- */
+  .quick { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:14px; font-size:13px; }
+  .quick .lab { color:var(--dim); }
+  .qchip { background:var(--panel); border:1px solid var(--line); color:var(--ink); border-radius:18px;
+    padding:5px 12px; cursor:pointer; max-width:340px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .qchip:hover { border-color:var(--ok); }
+  .quick a { cursor:pointer; }
+  /* --- history + posts pages --- */
+  .panelbox { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 18px; }
+  .rows { display:grid; grid-template-columns:repeat(auto-fill,minmax(380px,1fr)); gap:12px; margin-top:14px; }
+  .rowcard { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; font-size:14px; }
+  .view select, .view input[type=number] { background:var(--panel2); color:var(--ink);
+    border:1px solid var(--line); border-radius:7px; padding:7px 9px; font-size:13.5px; }
+  .tp-form { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:6px; margin-top:8px; }
+  .tp-form input { width:100%; }
+  .statline { color:var(--dim); font-size:13.5px; line-height:1.8; }
+  .statline b { color:var(--ink); }
   .bar { display:flex; gap:10px; margin-bottom:14px; }
   .bar input.topic { flex:1; padding:12px 14px; background:var(--panel); color:var(--ink);
     border:1px solid var(--line); border-radius:9px; font-size:15px; }
@@ -101,7 +247,83 @@
   <span class="sub">topic &rarr; auto-research &rarr; posts &rarr; review &rarr; publish</span>
   <span class="mode" id="mode"></span>
 </header>
-<main>
+<div class="shell">
+<nav id="nav">
+  <button class="navbtn" data-view="create"><span class="ico">✍</span> Create post</button>
+  <button class="navbtn" data-view="content"><span class="ico">🎬</span> Content generator</button>
+  <button class="navbtn" data-view="trending"><span class="ico">🔥</span> Current trending
+    <span class="pill" id="nav-rising" style="display:none"></span></button>
+  <button class="navbtn" data-view="update"><span class="ico">🔔</span> <span id="nav-update-label">Trend update</span>
+    <span class="pill" id="nav-update-new" style="display:none;background:#58a6ff">new</span></button>
+  <button class="navbtn" data-view="history"><span class="ico">🗓</span> Past days</button>
+  <button class="navbtn" data-view="posts"><span class="ico">📊</span> My posts &amp; results</button>
+  <div class="navnote" id="nav-note"></div>
+</nav>
+<div>
+<section class="view" id="view-trending">
+  <div class="pagehead">
+    <h2>Current trending</h2><div class="seg" id="tp-win" title="Compare whole days: a story usually takes about a day to mature across media"></div><span class="grow"></span>
+    <label class="chk" style="display:flex;gap:7px;align-items:center;color:var(--dim);cursor:pointer;font-size:13.5px">
+      <input type="checkbox" id="tp-all"> Include off-niche India trends</label>
+    <button class="tp-btn" id="tp-collect" title="Collect from all sources now">↻ Refresh</button>
+  </div>
+  <div class="pagesub" id="tp-asof">Loading…</div>
+  <div id="tp-warn"></div>
+  <div id="tp-pulse"></div>
+  <div class="board" id="tp-board"></div>
+  <div class="health" id="tp-src"></div>
+</section>
+<section class="view" id="view-content">
+  <div class="pagehead"><h2>Content generator</h2></div>
+  <div class="pagesub">For a video you have already made: pick where it is going, say what it is about, and get the title, description, tags and hashtags in that platform's format — built from what people are searching and which titles are winning right now.</div>
+  <div class="panelbox">
+    <div class="cg-form">
+      <div><label>Platform</label><select id="cg-platform"></select></div>
+      <div><label>Language</label><select id="cg-lang"></select></div>
+      <div class="wide"><label>What is the video about? (one line — the subject, as a viewer would search it)</label>
+        <input id="cg-topic" class="cg-in" placeholder='e.g. "Jio IPO shareholder quota explained"' maxlength="200"></div>
+      <div class="wide"><label>What does it cover? (optional — key points, numbers, names. The package only describes what you list here.)</label>
+        <textarea id="cg-notes" class="cg-in" rows="3" placeholder="e.g. price band, who qualifies for shareholder quota, how to apply, risks, my view on valuation"></textarea></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;align-items:center">
+      <button class="tp-btn" id="cg-analyse">Analyse trends (free)</button>
+      <button class="tp-btn gold" id="cg-go">Suggest title, tags &amp; description</button>
+      <span class="tp-sig" id="cg-status"></span>
+    </div>
+  </div>
+  <div class="banner err" id="cg-err"></div>
+  <div class="cg-out" id="cg-out"></div>
+  <details class="panelbox" id="cg-recent-box" style="margin-top:16px;display:none">
+    <summary style="cursor:pointer;color:var(--dim)">Recent packages</summary>
+    <div id="cg-recent"></div>
+  </details>
+</section>
+<section class="view" id="view-update">
+  <div class="pagehead">
+    <h2 id="up-title">Trend update</h2><div class="seg" id="up-win"></div><span class="grow"></span>
+    <label class="chk" style="display:flex;gap:7px;align-items:center;color:var(--dim);cursor:pointer;font-size:13.5px">
+      <input type="checkbox" id="up-all"> Include off-niche India trends</label>
+    <select id="up-pick" title="Past updates"></select>
+  </div>
+  <div class="pagesub" id="up-sub">Loading…</div>
+  <div id="up-warn"></div>
+  <div class="panelbox statline" id="up-sum" style="margin-bottom:16px"></div>
+  <div class="board" id="up-board" style="grid-template-columns:repeat(3,minmax(0,1fr))"></div>
+  <div id="up-dropped"></div>
+</section>
+<section class="view" id="view-history">
+  <div class="pagehead"><h2>Past days</h2><span class="grow"></span><select id="tp-day"></select></div>
+  <div class="pagesub">What trended on each day, and the path every topic took. One row per topic per day, kept permanently.</div>
+  <div class="rows" id="tp-histlist"></div>
+</section>
+<section class="view" id="view-posts">
+  <div class="pagehead"><h2>My posts &amp; results</h2></div>
+  <div class="pagesub">Every post you publish is logged with the trend state its topic was in. Enter the numbers to see what works for you.</div>
+  <div class="panelbox statline" id="tp-postsum"></div>
+  <div class="rows" id="tp-postlist"></div>
+</section>
+<main class="view" id="view-create">
+  <div class="quick" id="quick" style="display:none"></div>
   <div class="bar">
     <input class="topic" id="topic" placeholder='e.g. "Iran-Iraq war"' autofocus>
     <select id="trendcat" title="Which kind of trending stories to scout"></select>
@@ -158,7 +380,8 @@
     <div id="jobs"></div>
   </div>
 </main>
-
+</div>
+</div>
 <script>
 const $ = id => document.getElementById(id);
 const LABEL = {twitter:"Twitter / X", instagram:"Instagram", linkedin:"LinkedIn"};
@@ -171,7 +394,9 @@ async function api(path, body) {
   if (!r.ok) throw new Error(data.error || ("HTTP "+r.status));
   return data;
 }
-function esc(s){ return (s||"").replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+// Quotes too: esc() output lands inside attributes (alt="..."), and the text
+// comes from an LLM that just read arbitrary web pages.
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
 function selectedPlatforms(){ return [...document.querySelectorAll(".plat:checked")].map(c=>c.value); }
 function formatsMap(){
@@ -198,8 +423,11 @@ async function generate() {
   $("err").style.display="none"; $("searchnote").style.display="none"; $("out").innerHTML="";
   $("go").disabled=true; $("spin").style.display="block";
   try {
+    // Only stamp the run with a trend if the topic box still holds what was clicked.
+    const trendId = (PICKED && PICKED.label === topic) ? PICKED.id : null;
     const d = await api("/api/generate", {topic, platforms:plats, formats:formatsMap(),
-      web_search:ws, image_backend:$("imgbackend").value, image_template:$("imgtemplate").value});
+      web_search:ws, image_backend:$("imgbackend").value, image_template:$("imgtemplate").value,
+      trend_topic_id:trendId});
     RUN = d.run_id; render(d);
     if (!ws) $("searchnote").style.display="block";
   } catch(e) { showErr(e.message); }
@@ -219,9 +447,10 @@ function render(d) {
         ? `<div class="flag">⚠ sensitivity: ${d.brief.sensitivity_flags.map(esc).join(", ")}</div>`:"")
     + `<h2 style="margin-top:14px">Angle — ${esc(d.angle.angle_type)}</h2><div>${esc(d.angle.angle)}</div>
        <div style="color:var(--dim);margin-top:4px">Key message: ${esc(d.angle.key_message)}</div>
+       ${d.trend_state?`<div style="color:var(--dim);margin-top:4px">Trend stage when written: <b class="st-${esc(d.trend_state)}">${esc(STATE_NAME[d.trend_state]||d.trend_state)}</b> — the angle was chosen for this stage.</div>`:""}
        <h2 style="margin-top:14px">Review</h2>
        <div>Verdict: <span class="verdict v-${rec}">${rec}</span></div>
-       <div style="color:var(--dim)">${esc(d.review.summary)}</div></div><div class="grid">`;
+       <div style="color:var(--dim)">${esc(d.review.summary)}</div>${writerLine(d)}</div><div class="grid">`;
 
   for (const key of ["instagram","twitter","linkedin"]) {
     const draft = d.drafts[key]; if (!draft) continue;
@@ -232,11 +461,12 @@ function render(d) {
       img = d.image_url ? `<img src="${d.image_url}" alt="${esc(draft.alt_text||"")}">`
         : `<div class="noimg">image not rendered${d.image_error?": "+esc(d.image_error):""}</div>`;
     html += `<div class="card">
-      <h3>${LABEL[key]} <span class="badge b-${p.state}">${p.verdict}</span></h3>
+      <h3>${LABEL[key]} <span class="badge b-${esc(p.state)}">${esc(p.verdict)}</span></h3>
       ${img}<div class="caption">${esc(draft.caption)}</div>
       ${tags?`<div class="tags">${esc(tags)}</div>`:""}
-      <div class="count">${(draft.caption||"").length} chars${p.creds?"":" · no credentials"}</div>
+      <div class="count">${p.chars!=null ? `${p.chars}${p.limit?" / "+p.limit:""} chars incl. hashtags` : `${(draft.caption||"").length} chars`}${p.creds?"":" · no credentials"}</div>
       ${p.issues&&p.issues.length?`<div class="issues">${p.issues.map(esc).join("<br>")}</div>`:""}
+      ${fitBlock(p.fit)}
       ${postButton(key, p)}
       <div class="result" id="res-${key}"></div></div>`;
   }
@@ -246,6 +476,28 @@ function render(d) {
     const btn = $("btn-"+key); if (btn) btn.onclick = ()=>act(key, d.platforms[key]);
   }
   refreshJobs();
+}
+
+// Which model wrote it — and, if a free one was skipped, why.
+function writerLine(d) {
+  if (!d.writer) return "";
+  const skipped = (d.writer_skipped||[]).map(s=>esc(s.split(" — ")[0])).join(", ");
+  return `<div class="tp-sig">Written by <b>${esc(d.writer)}</b>${skipped?` · skipped (unavailable): ${skipped}`:""}</div>`;
+}
+
+// How well the draft is shaped for the platform's ranking. Advisory only.
+function fitBlock(f) {
+  if (!f || f.score == null) return "";
+  const cls = f.score>=80 ? "up" : f.score>=55 ? "flat" : "down";
+  const fails = f.checks.filter(c=>!c.ok).length;
+  return `<details class="fit" ${fails?"open":""}>
+    <summary>Algorithm fit <b class="${cls}">${f.score}/100</b>${fails?` · ${fails} to fix`:" · all checks pass"}</summary>
+    <div class="fitnote">${esc(f.optimises_for)}</div>
+    ${f.checks.map(c=>`<div class="fitrow"><span class="${c.ok?"up":"down"}">${c.ok?"✓":"✗"}</span>
+      <div><b>${esc(c.label)}</b> — ${esc(c.measured)}${c.ok?"":`<div class="fitnote">${esc(c.why)} <i>(${esc(c.basis)})</i></div>`}</div></div>`).join("")}
+    ${f.first_comment?`<div class="fitnote"><b>Put the link in the first comment / reply, not the post:</b><br>${esc(f.first_comment)}</div>`:""}
+    ${f.advice.length?`<div class="fitnote"><b>Beyond the text:</b><ul>${f.advice.map(a=>`<li>${esc(a)}</li>`).join("")}</ul></div>`:""}
+  </details>`;
 }
 
 function postButton(key, p) {
@@ -278,6 +530,7 @@ async function act(key, p) {
     } else {
       const r = await api("/api/publish", {run_id:RUN, platform:key, confirm:confirmFlag});
       box.innerHTML = renderResult(r);
+      loadPosts();
     }
   } catch(e) { box.innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`; }
 }
@@ -305,7 +558,7 @@ async function refreshJobs() {
       <span>${esc(j.topic)}</span>
       <span class="when">⏱ ${esc(j.when_label)}</span>
       <span class="st">${j.live?"live":"dry-run"} · ${j.status}${j.detail?" — "+esc(j.detail):""}</span>
-      ${j.status==="pending"?`<button onclick="cancelJob('${j.id}')">Cancel</button>`:""}
+      ${j.status==="pending"||j.status==="error"?`<button onclick="cancelJob('${esc(j.id)}')">${j.status==="error"?"Dismiss":"Cancel"}</button>`:""}
     </div>`).join("");
   } catch(e) {}
 }
@@ -370,6 +623,428 @@ $("topic").addEventListener("keydown", e=>{ if(e.key==="Enter") generate(); });
 setInterval(refreshJobs, 8000);
 loadConfig();
 refreshJobs();
+
+// ============================ pages + trend board ============================
+const STATES = ["EMERGING","RISING","PEAKING","FADING"];
+const STATE_NAME = {EMERGING:"Emerging", RISING:"Rising", PEAKING:"Peaking", FADING:"Fading", WATCH:"Watch"};
+const STATE_HINT = {
+  EMERGING:"New and not yet everywhere. Posting now is early — most upside, least proof.",
+  RISING:"Gaining share of attention. The window to post is now.",
+  PEAKING:"Holding steady — no longer growing. Only worth it with a fresh angle.",
+  FADING:"Losing attention. Skip, or do a “what happens next” piece.",
+  WATCH:"Seen, but not enough history yet to say which way it is going."};
+const SRC_NAME = {news:"News", gtrends:"Google", youtube:"YouTube", wiki:"Wikipedia"};
+const VIEWS = ["create","content","trending","update","history","posts"];
+const SHOWN = 6;
+// The 1 day / 2 days switch, shared by the board and the update page; remembered per browser.
+let WIN = 24, WIN_OPTS = [24, 48];
+try { WIN = +localStorage.getItem("trendWindow") || 24; } catch(e) {}
+function span(h){ h = +h; return h % 24 === 0 ? (h === 24 ? "1 day" : `${h/24} days`) : `${h}h`; }
+function renderWinSwitches(){
+  for (const id of ["tp-win", "up-win"]) {
+    $(id).innerHTML = WIN_OPTS.map(h=>`<button data-h="${h}" class="${h==WIN?"on":""}">${span(h)}</button>`).join("");
+    for (const b of $(id).querySelectorAll("button")) b.onclick = ()=>{
+      WIN = +b.dataset.h; try { localStorage.setItem("trendWindow", WIN); } catch(e) {}
+      renderWinSwitches(); refreshTrends(); if (VIEW === "update") loadUpdate($("up-pick").value || undefined);
+    };
+  }
+}
+let BOARD = null, PICKED = null, TP_TIMER = null, VIEW = "create", EXPANDED = {};
+
+function show(view){
+  VIEW = VIEWS.includes(view) ? view : "create";
+  for (const v of VIEWS) $("view-"+v).classList.toggle("on", v === VIEW);
+  for (const b of document.querySelectorAll(".navbtn")) b.classList.toggle("on", b.dataset.view === VIEW);
+  if (location.hash.slice(1) !== VIEW) history.replaceState(null, "", "#"+VIEW);
+  if (VIEW === "update") loadUpdate();
+  if (VIEW === "history") loadHistory();
+  if (VIEW === "posts") loadPosts();
+  if (VIEW === "trending") renderTrends();
+  window.scrollTo(0, 0);
+}
+for (const b of document.querySelectorAll(".navbtn")) b.onclick = ()=>show(b.dataset.view);
+window.addEventListener("hashchange", ()=>show(location.hash.slice(1)));
+
+function hhmm(epoch){ return new Date(epoch*1000).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}); }
+function ago(epoch){
+  const m = Math.round((Date.now()/1000 - epoch)/60);
+  return m < 1 ? "just now" : m < 60 ? m+" min ago" : m < 1440 ? Math.round(m/60)+" h ago" : Math.round(m/1440)+" d ago";
+}
+function spark(vals){
+  const pts = vals.map((v,i)=>[i,v]).filter(p=>p[1]!=null);
+  if (pts.length < 2) return "";
+  const W=84, H=22, max=Math.max(...pts.map(p=>p[1])) || 1, n=vals.length-1;
+  const d = pts.map(p=>`${(p[0]/n*W).toFixed(1)},${(H-1-(p[1]/max)*(H-2)).toFixed(1)}`).join(" ");
+  return `<svg width="${W}" height="${H}" style="flex:none"><polyline points="${d}" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>`;
+}
+function velBadge(e){
+  if (e.velocity_pct == null) return `<span class="tp-vel flat">${e.state==="FADING"?"quiet":"new"}</span>`;
+  const v = e.velocity_pct, cls = v>=30?"up":v<=-30?"down":"flat";
+  return `<span class="tp-vel ${cls}">${v>0?"+":""}${v>999?">999":v}%</span>`;
+}
+function rowsFor(state){
+  const all = (BOARD && BOARD.states[state]) || [];
+  return $("tp-all").checked ? all : all.filter(e=>e.niche);
+}
+function useTopic(e){
+  PICKED = {id:e.id, label:e.label};
+  $("topic").value = e.label;
+  show("create"); $("topic").focus();
+}
+function card(e, key){
+  const link = e.links[0] && /^https?:\/\//.test(e.links[0].url||"") ? e.links[0] : null;
+  return `<div class="tcard" data-k="${key}">
+    <div class="top"><div class="label">${esc(e.label)}</div>${velBadge(e)}</div>
+    <div class="tmeta">
+      ${e.sources.map(s=>`<span class="src ${e.sources.length>1?"multi":""}">${SRC_NAME[s]||esc(s)}</span>`).join("")}
+      ${e.niche?"":`<span class="src">off-niche</span>`}
+      <span style="flex:1"></span><span class="st-${e.state}">${spark(e.spark)}</span>
+    </div>
+    <div class="tp-sig">${e.signals.map(esc).join("<br>")}
+      ${link?`<br><a href="${esc(link.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">↗ read at ${esc(link.publisher||"source")}</a>`:""}</div>
+    <div class="use">Use this topic →</div>
+  </div>`;
+}
+function renderQuick(){
+  const rows = BOARD ? BOARD.states.RISING.filter(e=>e.niche).slice(0,3) : [];
+  const q = $("quick");
+  q.style.display = rows.length ? "flex" : "none";
+  q.innerHTML = `<span class="lab">🔥 Rising now:</span>` + rows.map((e,i)=>
+    `<span class="qchip" data-i="${i}" title="${esc(e.label)}">${esc(e.label)}</span>`).join("")
+    + `<a id="quick-all">see all →</a>`;
+  for (const c of q.querySelectorAll(".qchip")) c.onclick = ()=>useTopic(rows[+c.dataset.i]);
+  if (rows.length) $("quick-all").onclick = ()=>show("trending");
+}
+function renderTrends(){
+  if (!BOARD) return;
+  const b = BOARD;
+  const rising = b.states.RISING.filter(e=>e.niche).length;
+  $("nav-rising").style.display = rising ? "inline-block" : "none";
+  $("nav-rising").textContent = rising;
+  $("nav-note").textContent = b.sources.length ? `Trends updated ${hhmm(b.as_of)}` : "";
+  renderQuick();
+  $("tp-collect").disabled = !!b.collecting;
+  $("tp-collect").textContent = b.collecting ? "Collecting…" : "↻ Refresh";
+  $("tp-asof").textContent = b.sources.length
+    ? `As of ${hhmm(b.as_of)} · each topic's share of attention over ${span(b.window_hours)}, compared with the ${span(b.window_hours)} before`
+      + (b.window_hours != WIN ? ` (widened from ${span(WIN)}: too little activity to compare)` : "")
+      + ` · click a card to write a post on it`
+    : (b.collecting ? "First collection running — about 20 seconds…" : "No data collected yet.");
+  const bad = b.sources.filter(s=>s.stale || !s.ok);
+  $("tp-warn").innerHTML = bad.length ? `<div class="tp-warn">⚠ ${bad.map(s=>
+      `${esc(s.label)}: ${s.ok ? "stale" : "failed"}${s.last_ok ? " (last good "+ago(s.last_ok)+")" : " (never succeeded)"}`
+    ).join(" · ")}. The board may be out of date for ${bad.length>1?"these sources":"this source"}.</div>` : "";
+  if (b.coverage != null && b.coverage < 1 && b.sources.length)
+    $("tp-warn").innerHTML += `<div class="tp-warn">Collected for ${b.history_hours}h so far; this view compares ${span(b.window_hours*2)}. `
+      + `News for the earlier window is filled in from article dates, but YouTube and Google numbers only exist from when collection began — `
+      + `treat “rising” as provisional until ${span(b.window_hours*2)} have been collected.</div>`;
+  renderPulse(b);
+  if (!b.comparable && b.sources.length)
+    $("tp-warn").innerHTML += `<div class="tp-warn">Not enough history yet to compare two time windows — direction (rising / fading) is not reliable until a few more collections have run.</div>`;
+  const cols = STATES.concat(rowsFor("WATCH").length ? ["WATCH"] : []);
+  $("tp-board").className = "board" + (cols.length === 5 ? " five" : "");
+  const lookup = {};
+  $("tp-board").innerHTML = cols.map(s=>{
+    const rows = rowsFor(s), open = EXPANDED[s], vis = open ? rows : rows.slice(0, SHOWN);
+    vis.forEach((e,i)=>{ lookup[s+":"+i] = e; });
+    return `<div class="col c-${s}">
+      <h3 class="st-${s}">${STATE_NAME[s]} <span class="n">${rows.length}</span></h3>
+      <div class="hint">${STATE_HINT[s]}</div>
+      ${vis.map((e,i)=>card(e, s+":"+i)).join("") || `<div class="tp-empty">Nothing ${STATE_NAME[s].toLowerCase()} right now.</div>`}
+      ${rows.length > SHOWN ? `<button class="more" data-s="${s}">${open ? "Show fewer" : `Show all ${rows.length}`}</button>` : ""}
+    </div>`;
+  }).join("");
+  for (const el of document.querySelectorAll(".tcard")) el.onclick = ()=>useTopic(lookup[el.dataset.k]);
+  for (const m of document.querySelectorAll(".more")) m.onclick = ()=>{ EXPANDED[m.dataset.s] = !EXPANDED[m.dataset.s]; renderTrends(); };
+  $("tp-src").innerHTML = b.sources.map(s=>
+    `<span><span class="${s.ok&&!s.stale?"ok":"bad"}">●</span> ${esc(s.label)} — ${s.last_ok?ago(s.last_ok):"never"} · ${s.items||0} items</span>`).join("");
+}
+const KIND = {live:"live", short:"Short", long:""};
+function renderPulse(b){
+  const rows = b.creator_pulse || [];
+  if (!rows.length) { $("tp-pulse").innerHTML = ""; return; }
+  $("tp-pulse").innerHTML = `<div class="pulse"><h3>Creator pulse <span class="n" style="color:var(--dim);font-size:13px;font-weight:400">— what your preferred creators uploaded in the last 3 days, fastest against their own usual pace first</span></h3>
+    <div class="tp-sig">Many of these are not tied to a news story — creators also work evergreen angles. A video running at 2×+ its channel's normal is what their audience wants now. Click to use its subject.</div>
+    <div class="rows2">${rows.map((v,i)=>`<div class="prow" data-i="${i}">
+      <span class="x ${v.outlier>=1.5?"up":v.outlier!=null&&v.outlier<0.7?"down":"flat"}">${v.outlier!=null ? v.outlier+"×" : "–"}</span>
+      <span class="t">${esc(v.title)}<br><span class="tp-sig">${esc(v.channel)}${KIND[v.kind]?` · ${KIND[v.kind]}`:""} · ${v.views.toLocaleString()} views in ${v.age_hours}h
+        ${v.topic?` · on board: <span class="st-${esc(v.topic.state)}">${esc(STATE_NAME[v.topic.state]||v.topic.state)}</span>`:" · no matching news story"}</span></span>
+    </div>`).join("")}</div></div>`;
+  for (const el of $("tp-pulse").querySelectorAll(".prow")) el.onclick = ()=>{
+    const v = rows[+el.dataset.i];
+    if (v.topic) useTopic(v.topic); else { PICKED = null; $("topic").value = v.title; show("create"); $("topic").focus(); }
+  };
+}
+async function refreshTrends(){
+  try {
+    const r = await fetch("/api/trends?window=" + WIN); const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "HTTP "+r.status);
+    if (d.window_options && d.window_options.length) {
+      WIN_OPTS = d.window_options;
+      if (!WIN_OPTS.includes(WIN)) { WIN = WIN_OPTS[0]; }
+      renderWinSwitches();
+    }
+    BOARD = d; renderTrends();
+    clearTimeout(TP_TIMER);
+    TP_TIMER = setTimeout(refreshTrends, d.collecting || !d.sources.length ? 5000 : 60000);
+  } catch(e) {
+    $("tp-asof").textContent = "Trend board unavailable: " + e.message;
+    clearTimeout(TP_TIMER); TP_TIMER = setTimeout(refreshTrends, 30000);
+  }
+}
+$("tp-all").onchange = ()=>{ renderTrends(); if (VIEW === "history") loadHistory($("tp-day").value); };
+$("tp-collect").onclick = async ()=>{
+  try {
+    const r = await api("/api/trends/collect", {});
+    if (!r.started) { $("tp-asof").textContent = r.reason; return; }
+    $("tp-collect").disabled = true; $("tp-collect").textContent = "Collecting…";
+    clearTimeout(TP_TIMER); TP_TIMER = setTimeout(refreshTrends, 3000);
+  } catch(e) { $("tp-asof").textContent = e.message; }
+};
+
+// --- content generator: packaging for a video already made ---
+let CG_COPY = [];
+function copyBtn(text){ CG_COPY.push(String(text)); return `<button class="copy" data-c="${CG_COPY.length-1}">copy</button>`; }
+function wireCopy(root){
+  for (const b of root.querySelectorAll(".copy")) b.onclick = async ()=>{
+    try { await navigator.clipboard.writeText(CG_COPY[+b.dataset.c]); b.textContent = "copied"; }
+    catch(e) { b.textContent = "copy failed"; }
+    setTimeout(()=>{ b.textContent = "copy"; }, 1400);
+  };
+}
+function evidenceHtml(d){
+  const ev = d.evidence, st = d.strategy, now = ev.now;
+  const sec = (title, body)=> body ? `<div class="cg-sec"><h4>${title}</h4>${body}</div>` : "";
+  return `<div class="cg-box"><h3>What the data says</h3>
+    <div class="cg-read">${now?`<b class="st-${esc(now.state)}">${esc(STATE_NAME[now.state]||now.state)}</b> · `:""}${esc(st.headline)}</div>
+    ${st.notes.map(n=>`<div class="tp-sig">• ${esc(n)}</div>`).join("")}
+    ${sec(`What people type — ${esc(ev.suggest_feed||"search")} suggestions`,
+      (ev.searches||[]).map(s=>`<span class="cg-chip">${esc(s)}</span>`).join(""))}
+    ${sec("Trending on Google India right now",
+      (ev.trending_searches||[]).map(s=>`<span class="cg-chip">${esc(s.query)}${s.searches?` · ${s.searches.toLocaleString()}+`:""}</span>`).join(""))}
+    ${sec("Competing videos — creators first, then how far each beats its channel's usual pace",
+      (ev.videos||[]).map(v=>`<div class="cg-line"><span class="num">${v.outlier ? v.outlier+"× usual" : v.views_per_hour.toLocaleString()+"/h"}</span>
+        <span>${esc(v.title)}<br><span class="tp-sig">${esc(v.channel)}${v.creator?`<span class="tagc">creator</span>`:""}${v.kind&&v.kind!=="long"?` · ${v.kind==="short"?"Short":"live"}`:""} · ${v.views_per_hour.toLocaleString()} views/h · ${v.views.toLocaleString()} views · ${v.age_hours}h old · ${v.title_chars} chars</span></span></div>`).join(""))}
+    ${sec(`Recent headlines${ev.publishers?` — ${ev.publishers} publishers`:""}`,
+      (ev.headlines||[]).slice(0,6).map(h=>`<div class="cg-line"><span>${esc(h.title)}<br><span class="tp-sig">${esc(h.publisher||"")} · ${ago(h.at)}</span></span></div>`).join(""))}
+    ${sec("Word pairs used most", (ev.phrases||[]).map(p=>`<span class="cg-chip">${esc(p.phrase)} · ${p.count}</span>`).join(""))}
+    ${sec(`Past trend — items per day (${ev.days_of_history} day${ev.days_of_history==1?"":"s"} of history collected)`,
+      (ev.daily||[]).map(x=>`<div class="cg-line"><span class="num">${esc(x.day.slice(5))}</span><span>${x.articles} article${x.articles==1?"":"s"} · ${x.videos} video${x.videos==1?"":"s"}</span></div>`).join(""))}
+    ${sec("Earlier days on the trend board",
+      (ev.past||[]).slice(0,8).map(x=>`<div class="cg-line"><span class="num">${esc(x.day.slice(5))}</span><span><span class="st-${esc(x.state)}">${esc(STATE_NAME[x.state]||x.state)}</span> · ${x.mentions} items</span></div>`).join(""))}
+  </div>`;
+}
+function packageHtml(d){
+  const p = d.package, f = d.fields, descName = (f.description && f.description.name) || "Description";
+  const sec = (title, extra, body)=> `<div class="cg-sec"><h4>${title} ${extra||""}</h4>${body}</div>`;
+  let h = `<div class="cg-box"><h3>Your ${esc(d.label)} package</h3>`;
+  const warns = d.limit_notes.concat((d.quality_notes||[]).map(x=>"Still to fix by hand: " + x));
+  if (warns.length) h += `<div class="tp-warn">⚠ ${warns.map(esc).join("<br>⚠ ")}</div>`;
+  h += writerLine(d);
+  if (d.revised) h += `<div class="tp-sig">The first draft had weak spots (filler, repeated thumbnail text or figures not in your notes) and was rewritten once automatically.</div>`;
+  if (p.titles) h += sec("Title options", "", p.titles.map(t=>`<div class="cg-item">
+      <div class="txt">${esc(t.text)}</div>
+      <div class="tp-sig"><span class="${t.over_limit?"down":t.truncated_in_search?"flat":"up"}">${t.chars} / ${f.titles.max} chars${t.over_limit?" — over the limit":t.truncated_in_search?` — will be cut after ~${f.titles.show} in search`:""}</span>
+        · ${esc(t.why)} ${copyBtn(t.text)}</div></div>`).join(""));
+  for (const key of ["thumbnail_text","cover_text"]) if (p[key]) h += sec(key==="thumbnail_text"?"Thumbnail text":"Cover text", "",
+      p[key].map(x=>`<span class="cg-chip">${esc(x)} ${copyBtn(x)}</span>`).join(""));
+  if (p.description != null) h += sec(esc(descName), `<span style="text-transform:none;letter-spacing:0">${p.description_chars} / ${f.description.max} chars</span> ${copyBtn(p.description)}`,
+      `<div class="cg-pre">${esc(p.description)}</div>`);
+  if (p.tags) h += sec("Tags", `<span style="text-transform:none;letter-spacing:0">${p.tags_chars} / ${f.tags.max_total} chars</span> ${copyBtn(p.tags.join(", "))}`,
+      p.tags.map(t=>`<span class="cg-chip">${esc(t)}</span>`).join("") + `<div class="tp-sig">Tags matter little on YouTube — mainly for misspellings. The title and description do the work.</div>`);
+  if (p.hashtags) { const tags = p.hashtags.map(x=>"#"+x).join(" ");
+    h += sec("Hashtags", copyBtn(tags), p.hashtags.map(x=>`<span class="cg-chip">#${esc(x)}</span>`).join("") || `<span class="tp-sig">none</span>`); }
+  if (p.pinned_comment) h += sec("Pinned comment", copyBtn(p.pinned_comment), `<div class="cg-pre">${esc(p.pinned_comment)}</div>`);
+  return h + `</div>`;
+}
+async function runContent(analyseOnly){
+  const topic = $("cg-topic").value.trim();
+  $("cg-err").style.display = "none";
+  if (!topic) { $("cg-err").textContent = "Say what the video is about."; $("cg-err").style.display = "block"; return; }
+  $("cg-analyse").disabled = $("cg-go").disabled = true;
+  $("cg-status").textContent = analyseOnly ? "Reading the trend store…" : "Analysing, then writing — about 15 seconds…";
+  try {
+    const d = await api("/api/content", {platform:$("cg-platform").value, language:$("cg-lang").value,
+      topic, notes:$("cg-notes").value, analyse_only:analyseOnly});
+    CG_COPY = [];
+    $("cg-out").className = "cg-out" + (d.package ? "" : " single");
+    $("cg-out").innerHTML = evidenceHtml(d) + (d.package ? packageHtml(d) : "");
+    wireCopy($("cg-out"));
+    if (d.package) loadContentFormats(true);
+  } catch(e) { $("cg-err").textContent = e.message; $("cg-err").style.display = "block"; }
+  finally { $("cg-analyse").disabled = $("cg-go").disabled = false; $("cg-status").textContent = ""; }
+}
+async function loadContentFormats(recentOnly){
+  try {
+    const d = await (await fetch("/api/content/formats")).json();
+    if (!recentOnly) {
+      $("cg-platform").innerHTML = d.platforms.map(p=>`<option value="${esc(p.id)}">${esc(p.label)}</option>`).join("");
+      $("cg-lang").innerHTML = d.languages.map(l=>`<option value="${esc(l)}">${esc(l[0].toUpperCase()+l.slice(1))}</option>`).join("");
+    }
+    $("cg-recent-box").style.display = d.recent.length ? "block" : "none";
+    const names = Object.fromEntries(d.platforms.map(p=>[p.id, p.label]));
+    $("cg-recent").innerHTML = d.recent.map(r=>`<div class="cg-line"><span class="num">${esc(ago(r.created_at))}</span>
+      <span><b>${esc(names[r.platform]||r.platform)}</b> · ${esc(r.topic)}
+        ${r.trend_state?` · <span class="st-${esc(r.trend_state)}">${esc(STATE_NAME[r.trend_state]||r.trend_state)}</span>`:""}
+        <br><span class="tp-sig">${esc(r.package.titles ? r.package.titles[0].text : (r.package.description||"").slice(0,120))}</span></span></div>`).join("");
+  } catch(e) {}
+}
+$("cg-analyse").onclick = ()=>runContent(true);
+$("cg-go").onclick = ()=>runContent(false);
+$("cg-topic").addEventListener("keydown", e=>{ if (e.key === "Enter") runContent(true); });
+loadContentFormats(false);
+
+// --- periodic update: trending / same / fading, and what moved since the last one ---
+const CLS = ["TRENDING","SAME","FADING"];
+const CLS_NAME = {TRENDING:"Trending", SAME:"Same", FADING:"Fading"};
+const CLS_HINT = {
+  TRENDING:"Share of attention is up 30% or more on the window before, or the topic is new.",
+  SAME:"Holding its ground — within 30% of the window before.",
+  FADING:"Share of attention is down 30% or more, or it has gone quiet."};
+const RANK = {FADING:0, SAME:1, TRENDING:2};
+let UPD = null;
+function whenStr(epoch){
+  return new Date(epoch*1000).toLocaleString([], {day:"numeric", month:"short", hour:"2-digit", minute:"2-digit"});
+}
+function seenUpdate(){ try { return +localStorage.getItem("seenUpdate") || 0; } catch(e) { return 0; } }
+function moveChip(t, hasPrev){
+  if (!hasPrev) return "";
+  if (t.new) return `<span class="move fresh">new since last update</span>`;
+  if (!t.prev_cls) return `<span class="move fresh">back on the board</span>`;
+  if (t.prev_cls === t.cls) return `<span class="move">no change</span>`;
+  const up = RANK[t.cls] > RANK[t.prev_cls];
+  return `<span class="move ${up?"upm":"downm"}">${up?"▲":"▼"} was ${CLS_NAME[t.prev_cls].toLowerCase()}</span>`;
+}
+function renderUpdate(){
+  const d = UPD; if (!d) return;
+  const u = d.update, hrs = d.report_hours;
+  const every = hrs % 24 === 0 ? (hrs === 24 ? "Daily" : `${hrs/24}-day`) : `${hrs}-hour`;
+  $("nav-update-label").textContent = `${every} update`;
+  $("up-title").textContent = `${every} trend update`;
+  $("up-pick").innerHTML = d.updates.map(x=>`<option value="${x.id}" ${u&&x.id===u.id?"selected":""}>${esc(whenStr(x.ts))}</option>`).join("");
+  const nextTxt = d.next_due*1000 > Date.now() ? `next update ${whenStr(d.next_due)}` : `next update due now — runs with the next collection`;
+  if (!u) {
+    $("up-sub").textContent = `No update yet — the first one is taken right after the first collection. ${nextTxt}.`;
+    $("up-warn").innerHTML = $("up-sum").innerHTML = $("up-board").innerHTML = $("up-dropped").innerHTML = "";
+    return;
+  }
+  const w = u.window_hours, hasPrev = u.prev_ts != null;
+  $("up-sub").textContent = `Taken ${whenStr(u.ts)} · ${span(w)} compared with the ${span(w)} before · `
+    + (hasPrev ? `previous update ${whenStr(u.prev_ts)}` : "first update, nothing earlier to compare movement with")
+    + ` · ${nextTxt} · click a row to write a post on it`;
+  const warn = [];
+  if (u.window_hours != WIN)
+    warn.push(`This update was taken before the ${span(WIN)} view existed — showing its ${span(w)} view.`);
+  if (!u.comparable) warn.push("Not enough activity in both windows to compare — the classes below are not reliable for this update.");
+  if (u.late_hours > 0) warn.push(`The previous update was ${u.late_hours}h overdue (nothing was collecting), so “since last update” covers a longer gap than usual.`);
+  if (u.collections < u.expected_collections/2) warn.push(`Only ${u.collections} of about ${u.expected_collections} collections ran in this window. News is unaffected; YouTube and Google numbers are thinner than usual.`);
+  const badSrc = (u.sources||[]).filter(s=>s.stale || !s.ok);
+  if (badSrc.length) warn.push(`Stale or failed at the time: ${badSrc.map(s=>esc(s.label)).join(", ")}.`);
+  $("up-warn").innerHTML = warn.map(x=>`<div class="tp-warn">⚠ ${x}</div>`).join("");
+  const all = $("up-all").checked;
+  const rows = u.topics.filter(t=>all || t.niche), dropped = u.dropped.filter(t=>all || t.niche);
+  const by = c => rows.filter(t=>t.cls===c);
+  const turnedUp = rows.filter(t=>t.prev_cls && RANK[t.cls] > RANK[t.prev_cls]).length;
+  const turnedDown = rows.filter(t=>t.prev_cls && RANK[t.cls] < RANK[t.prev_cls]).length;
+  $("up-sum").innerHTML = CLS.map(c=>`<b class="st-${c}">${by(c).length}</b> ${CLS_NAME[c].toLowerCase()}`).join(" · ")
+    + (hasPrev ? `<br>Since the last update: <b>${rows.filter(t=>t.new || !t.prev_cls).length}</b> new · <b class="up">${turnedUp}</b> moved up · <b class="down">${turnedDown}</b> moved down · <b>${dropped.length}</b> dropped off` : "");
+  const lookup = {};
+  $("up-board").innerHTML = CLS.map(c=>{
+    const list = by(c);
+    return `<div class="col c-${c}"><h3 class="st-${c}">${CLS_NAME[c]} <span class="n">${list.length}</span></h3>
+      <div class="hint">${CLS_HINT[c]}</div>
+      ${list.map((t,i)=>{ lookup[c+":"+i] = t; return `<div class="urow" data-k="${c}:${i}">
+        <div class="lab">${esc(t.label)}<br>${moveChip(t, hasPrev)}
+          ${t.sources.map(s=>`<span class="move">${SRC_NAME[s]||esc(s)}</span>`).join(" ")}</div>
+        ${velBadge(t)}</div>`; }).join("") || `<div class="tp-empty">Nothing ${CLS_NAME[c].toLowerCase()} in this update.</div>`}
+    </div>`;
+  }).join("");
+  for (const el of document.querySelectorAll(".urow[data-k]")) el.onclick = ()=>useTopic(lookup[el.dataset.k]);
+  $("up-dropped").innerHTML = dropped.length ? `<div class="panelbox" style="margin-top:16px">
+    <div class="statline"><b>Dropped off since the last update</b> — on the previous update, no longer active enough to show:</div>
+    ${dropped.map(t=>`<div class="urow" style="cursor:default"><div class="lab">${esc(t.label)}</div>
+      <span class="move">was ${esc((CLS_NAME[t.prev_cls]||t.prev_cls).toLowerCase())}</span></div>`).join("")}</div>` : "";
+}
+async function loadUpdate(id){
+  try {
+    const r = await fetch("/api/trends/updates?window=" + WIN + (id ? "&id="+encodeURIComponent(id) : ""));
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "HTTP "+r.status);
+    UPD = d; renderUpdate();
+    const latest = d.updates[0] ? d.updates[0].id : 0;
+    if (VIEW === "update" && latest) { try { localStorage.setItem("seenUpdate", latest); } catch(e) {} }
+    $("nav-update-new").style.display = latest > seenUpdate() ? "inline-block" : "none";
+  } catch(e) { $("up-sub").textContent = "Update unavailable: " + e.message; }
+}
+$("up-pick").onchange = ()=>loadUpdate($("up-pick").value);
+$("up-all").onchange = renderUpdate;
+// Keep the nav badge current without the page open; reload the page's own view when a new one lands.
+setInterval(()=>{ if (VIEW !== "update" || !UPD || !UPD.update || $("up-pick").selectedIndex <= 0) loadUpdate(); }, 120000);
+loadUpdate();
+
+// --- past days ---
+async function loadHistory(day){
+  try {
+    const d = await (await fetch("/api/trends/history" + (day ? "?day="+encodeURIComponent(day) : ""))).json();
+    const sel = $("tp-day");
+    if (!day) {
+      sel.innerHTML = (d.days||[]).map(x=>`<option>${esc(x)}</option>`).join("");
+      if (d.days && d.days.length) return loadHistory(d.days[0]);
+      $("tp-histlist").innerHTML = `<div class="tp-empty">History builds up one day at a time.</div>`;
+      return;
+    }
+    $("tp-histlist").innerHTML = (d.topics||[]).filter(t=>$("tp-all").checked || t.niche).map(t=>`
+      <div class="rowcard">${esc(t.label)}
+        <div class="tp-sig">${t.path.map(s=>`<span class="st-${esc(s)}">${STATE_NAME[s]||esc(s)}</span>`).join(" → ")
+          || `<span class="st-${esc(t.state)}">${STATE_NAME[t.state]||esc(t.state)}</span>`}
+          · ${t.mentions} items · ${t.sources.map(s=>SRC_NAME[s]||esc(s)).join(", ")}</div></div>`).join("")
+      || `<div class="tp-empty">Nothing recorded.</div>`;
+  } catch(e) { $("tp-histlist").innerHTML = `<div class="tp-empty">${esc(e.message)}</div>`; }
+}
+$("tp-day").onchange = ()=>loadHistory($("tp-day").value);
+
+// --- my posts & results ---
+const MFIELDS = ["impressions","likes","comments","shares","saves","clicks"];
+function pct(x){ return (x*100).toFixed(1)+"%"; }
+async function loadPosts(){
+  if (VIEW !== "posts") return;
+  try {
+    const d = await (await fetch("/api/analytics")).json();
+    const s = d.summary;
+    const grp = (name, rows)=> rows.length ? `<br><b>${name}:</b> ` + rows.map(r=>
+      `${esc(r.key)} ${pct(r.avg_engagement_rate)} (n=${r.n})`).join(" · ") : "";
+    $("tp-postsum").innerHTML = `<b>${s.posts}</b> logged · <b>${s.live_posts}</b> live · <b>${s.measured}</b> with results`
+      + (s.measured ? `<br>Average engagement rate (likes + comments + shares + saves ÷ impressions):`
+          + grp("By trend state", s.by_trend_state) + grp("By platform", s.by_platform) + grp("By template", s.by_format)
+          + (s.measured < 20 ? `<br><i>Under 20 measured posts — treat these as anecdotes, not findings.</i>` : "")
+        : `<br>Results appear once live posts have numbers entered. Dry-runs are logged but never counted.`);
+    $("tp-postlist").innerHTML = d.posts.map(p=>`
+      <div class="rowcard">
+        <b>${esc(LABEL[p.platform]||p.platform)}</b> · ${esc(p.mode)}${p.scheduled?" · scheduled":""}
+        ${p.trend_state?` · <span class="st-${esc(p.trend_state)}">${STATE_NAME[p.trend_state]||esc(p.trend_state)}</span>`:""}
+        <div>${esc(p.topic)}</div>
+        <div class="tp-sig">${ago(p.created_at)}${p.metrics ? ` · ${p.metrics.impressions??"–"} impressions · ${p.metrics.engagement} engagements`
+            + (p.metrics.engagement_rate!=null?` · ${pct(p.metrics.engagement_rate)}`:"") + ` · ${p.snapshots} snapshot${p.snapshots>1?"s":""}` : " · no results yet"}
+          · <a href="#" data-p="${esc(p.id)}" class="tp-add">+ add results</a></div>
+        <div id="mf-${esc(p.id)}"></div>
+      </div>`).join("") || `<div class="tp-empty">No posts logged yet. Publish a draft from Create post and it appears here.</div>`;
+    for (const a of document.querySelectorAll(".tp-add")) a.onclick = ev=>{
+      ev.preventDefault();
+      const id = a.dataset.p;
+      $("mf-"+id).innerHTML = `<div class="tp-form">${MFIELDS.map(f=>
+        `<input type="number" min="0" placeholder="${f}" data-f="${f}">`).join("")}</div>
+        <button class="tp-btn" style="margin-top:8px">Save snapshot</button> <span class="tp-sig"></span>`;
+      $("mf-"+id).querySelector("button").onclick = async ()=>{
+        const body = {post_id:id};
+        for (const i of $("mf-"+id).querySelectorAll("input")) if (i.value !== "") body[i.dataset.f] = Number(i.value);
+        try { await api("/api/analytics/metrics", body); loadPosts(); }
+        catch(e) { $("mf-"+id).querySelector("span").textContent = e.message; }
+      };
+    };
+  } catch(e) { $("tp-postsum").textContent = e.message; }
+}
+show(location.hash.slice(1) || "create");
+refreshTrends();
 </script>
 </body>
 </html>

@@ -22,7 +22,13 @@ def _creds_map() -> dict[str, bool]:
 
 
 def run(topic: str, config: policy.Config, on_progress=None) -> dict:
-    result = orchestrator.run(topic, on_progress=on_progress)
+    # Draft only the enabled platforms — a disabled one would be paid for and
+    # then SKIPped by the policy anyway.
+    selected = [k for k in BY_KEY if k in config.enabled]
+    if not selected:
+        raise ValueError("MEDIA_ENGINE_PLATFORMS enables no known platform "
+                         f"(known: {', '.join(BY_KEY)})")
+    result = orchestrator.run(topic, platforms_selected=selected, on_progress=on_progress)
     frozen = manifest.build(result, approved_by="auto-policy")
     decisions = policy.decide(result["review"], _creds_map(), config)
 

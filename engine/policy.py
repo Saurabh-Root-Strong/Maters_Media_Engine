@@ -53,7 +53,8 @@ def decide(review: dict, creds_present: dict[str, bool], config: Config) -> dict
     out: dict[str, dict] = {}
 
     for platform, g in review.get("gate", {}).items():
-        verdict = g.get("verdict", "PASS")
+        # A missing verdict means "never reviewed" — treat as HOLD, not PASS.
+        verdict = g.get("verdict", "HOLD")
 
         if platform not in config.enabled:
             action, reason = SKIP, "platform disabled in config"
@@ -64,6 +65,8 @@ def decide(review: dict, creds_present: dict[str, bool], config: Config) -> dict
             )
         elif verdict == "REVISE":
             action, reason = BLOCK, "failed review after auto-revise"
+        elif verdict != "PASS":  # allow-list: only an explicit PASS may go further
+            action, reason = HOLD_FOR_HUMAN, f"unrecognised verdict {verdict!r}"
         elif not config.auto_publish:
             action, reason = HOLD_FOR_HUMAN, "auto-publish off — manual approval"
         elif not config.live:

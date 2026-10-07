@@ -13,6 +13,7 @@ produces the verdict a human (or, later, an auto-publish policy) acts on.
 
 from __future__ import annotations
 
+import copy
 import json
 
 from . import llm
@@ -23,7 +24,8 @@ _ORDER = {"PASS": 0, "REVISE": 1, "HOLD": 2}
 
 
 def _worst(*verdicts: str) -> str:
-    return max(verdicts, key=lambda v: _ORDER.get(v, 1))
+    # An unrecognised verdict ranks as HOLD — unknown must never beat a known one down.
+    return max(verdicts, key=lambda v: _ORDER.get(v, 2))
 
 
 def _is_wide(o: int) -> bool:
@@ -147,9 +149,14 @@ def critique(brief: dict, angle: dict, drafts: dict) -> dict:
         "BRIEF:\n" + json.dumps(brief, indent=2)
         + "\n\nANGLE:\n" + json.dumps(angle, indent=2)
         + "\n\nDRAFTS:\n" + json.dumps(drafts, indent=2)
-        + "\n\nReview every draft."
+        + "\n\nReview every draft. Use each draft's exact key as `platform`: "
+        + ", ".join(drafts) + "."
     )
-    return llm.structured(_CRITIQUE_SYSTEM, user, _CRITIQUE_SCHEMA, max_tokens=3000)
+    # Pin `platform` to the real draft keys so the verdict can't come back
+    # under a label ("Twitter/X") that review() fails to match.
+    schema = copy.deepcopy(_CRITIQUE_SCHEMA)
+    schema["properties"]["platforms"]["items"]["properties"]["platform"]["enum"] = list(drafts)
+    return llm.structured(_CRITIQUE_SYSTEM, user, schema, max_tokens=3000)
 
 
 # --- fusion ------------------------------------------------------------------
@@ -159,7 +166,9 @@ def review(brief: dict, angle: dict, drafts: dict, platforms: dict | None = None
     platforms = platforms or _load_platforms()
     validation = validate(drafts, platforms)
     crit = critique(brief, angle, drafts)
-    crit_by_platform = {p["platform"]: p for p in crit["platforms"]}
+    crit_by_platform = {
+        str(p.get("platform", "")).strip().lower(): p for p in crit.get("platforms", [])
+    }
     sensitive = bool(brief.get("sensitivity_flags"))
 
     gate: dict[str, dict] = {}
@@ -167,14 +176,24 @@ def review(brief: dict, angle: dict, drafts: dict, platforms: dict | None = None
         det_verdict = "REVISE" if any(
             i["level"] == "hard" for i in validation.get(key, [])
         ) else "PASS"
-        llm_verdict = crit_by_platform.get(key, {}).get("verdict", "PASS")
+        # Fail CLOSED: a draft the reviewer skipped was never checked, so it
+        # goes to a human rather than defaulting to PASS.
+        crit_p = crit_by_platform.get(key)
+        if crit_p is None:
+            llm_verdict = "HOLD"
+            editorial = ["reviewer returned no verdict for this platform — needs a human check"]
+        else:
+            llm_verdict = crit_p.get("verdict")
+            if llm_verdict not in _ORDER:
+                llm_verdict = "HOLD"
+            editorial = crit_p.get("issues", [])
         verdict = _worst(det_verdict, llm_verdict)
         if sensitive:
             verdict = _worst(verdict, "HOLD")
         gate[key] = {
             "verdict": verdict,
             "limit_issues": validation.get(key, []),
-            "editorial_issues": crit_by_platform.get(key, {}).get("issues", []),
+            "editorial_issues": editorial,
         }
 
     recommendation = _worst(*[g["verdict"] for g in gate.values()]) if gate else "PASS"

@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from engine import llm, manifest, orchestrator, publish  # noqa: E402  (after load_dotenv)
+from engine import drafters, llm, manifest, orchestrator, publish, review  # noqa: E402  (after load_dotenv)
 
 _RULE = "=" * 70
 _OUT_DIR = os.path.join(os.path.dirname(__file__), "output")
@@ -52,13 +52,17 @@ def _render(result: dict) -> None:
     print(f"  Key message: {angle['key_message']}")
 
     labels = {"instagram": "INSTAGRAM", "twitter": "TWITTER / X", "linkedin": "LINKEDIN"}
+    platforms = drafters._load_platforms()
     for key, draft in drafts.items():
         print(f"\n{_RULE}\n{labels.get(key, key.upper())}\n{_RULE}")
         print(draft["caption"])
         tags = " ".join(f"#{h.lstrip('#')}" for h in draft["hashtags"])
         if tags:
             print(f"\n{tags}")
-        print(f"\n[chars: {len(draft['caption'])}]")
+        # Same measure as the gate: caption + hashtags, emoji-weighted on X.
+        spec = platforms.get(key, {})
+        n = review.char_count(review.post_text(draft), spec)
+        print(f"\n[chars incl. hashtags: {n} / {spec.get('caption_max_chars', '?')}]")
         if draft.get("image_prompt"):
             print(f"\n  ALT TEXT: {draft['alt_text']}")
 
@@ -96,12 +100,21 @@ def _approve(result: dict) -> None:
     if not sys.stdin.isatty():
         print("Non-interactive shell — not approving. Re-run in a terminal to approve.")
         return
-    ans = input("Approve all drafts for publishing? [y/N] ").strip().lower()
+    # A draft that failed review (REVISE) is never approvable — the dashboard
+    # blocks it outright, so the manifest must not carry it into publishing.
+    blocked = [k for k, g in gate["gate"].items() if g["verdict"] == "REVISE"]
+    approvable = {k: d for k, d in result["drafts"].items() if k not in blocked}
+    if blocked:
+        print(f"✗ Blocked by review, excluded from approval: {', '.join(blocked)}")
+    if not approvable:
+        print("Nothing approvable. Nothing written.")
+        return
+    ans = input(f"Approve {', '.join(approvable)} for publishing? [y/N] ").strip().lower()
     if ans not in ("y", "yes"):
         print("Held. Nothing approved, nothing written.")
         return
 
-    path, frozen = manifest.write(result, _OUT_DIR)
+    path, frozen = manifest.write({**result, "drafts": approvable}, _OUT_DIR)
     print(f"Approved → manifest: {os.path.abspath(path)}")
     _publish(frozen)
 

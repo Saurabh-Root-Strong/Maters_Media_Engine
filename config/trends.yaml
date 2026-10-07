@@ -1,0 +1,90 @@
+# Trend tracker — free sources only (no API key needed for any of this).
+# Edit freely; the collector re-reads this file on every run.
+
+interval_minutes: 30      # how often the background collector runs while the app is up
+
+# The time window everything is judged on: a topic's share of attention in the
+# last `window_hours` against the `window_hours` before that. A story usually
+# takes about a day to mature across news, YouTube and search, so the board
+# compares whole days. `window_options` = the 1-day / 2-day switch in the
+# dashboard; the first entry is the default.
+window_hours: 24
+window_options: [24, 48]
+
+# Every `report_hours` an update is taken and stored for EACH window option:
+# what is trending, the same, or fading — and how each topic moved since the
+# previous update.
+report_hours: 24
+geo: IN                   # Google Trends + Wikipedia country
+
+# Google News RSS. `topic` = a Google News section; `q` = a search query
+# (Google's own operators work, e.g. when:1d). All of these are treated as
+# in-niche, so keep them about your beat.
+news:
+  - topic: BUSINESS
+  - q: "nifty OR sensex when:1d"
+  - q: "stock market india when:1d"
+  - q: "RBI OR SEBI when:1d"
+  - q: "IPO india when:2d"
+  - q: "Q2 results india shares NSE when:1d"
+  - q: "FII OR rupee OR crude oil india when:1d"
+
+# Publishers to drop entirely (exact name as shown in Google News) — for
+# auto-generated or off-market outlets that pollute the board.
+ignore_publishers:
+  - Univest          # broker self-promotion posts, not news (seen 2026-10-06)
+
+# YouTube channels to watch (free channel feed, includes view counts).
+# group: creator = independent finance creators who pick what to cover by what
+#                  is trending — their choices are a demand signal, so their
+#                  views count `creator_weight` times in the YouTube score and
+#                  their videos lead the "which titles are winning" lists;
+#        news    = TV / publisher channels — they cover everything, every day.
+# id = the channel's UC... id (the channel page's canonical link). Verified
+# 2026-10-07 against each channel page; subscriber counts noted as a sanity check.
+creator_weight: 2.0       # a creator's views count 2x ...
+news_channel_weight: 0.5  # ... a news channel's 0.5x: creators count 4x as much as TV desks.
+                          # News channels cover the whole day's agenda, not what is trending.
+                          # Also: two news-channel clips alone no longer make a topic "real".
+youtube:
+  # --- creators (preferred) ---
+  - {id: UCw5TLrz3qADabwezTEcOmgQ, name: Groww, group: creator}                    # @groww, 24.8 lakh
+  - {id: UCAQpvfptgfkFuFJI2_fmveA, name: IPO Review by Groww, group: creator}      # IPO explainers
+  - {id: UCfYHvYyFICHwHVO9lHwmiig, name: Neeraj Joshi, group: creator}             # @neerajjoshi, 52.8 lakh
+  - {id: UCcanCrgSWVYW7ZFNKQZso0g, name: Abhishek Kar, group: creator}             # @abhishekkar, 21.3 lakh
+  - {id: UCksVr8lIwOPd1UtJkE3mdJQ, name: A Digital Blogger, group: creator}        # @adigitalblogger, 12.4 lakh
+  - {id: UCvqttS8EzhRq2YWg03qKRCQ, name: Sanjay Kathuria, group: creator}          # @sanjay_kathuria, 14.2 lakh
+  - {id: UC0iDL9CSqHtlzJDZLGKJX0Q, name: Pushpendra Singh Digital, group: creator} # 3.82 lakh
+  - {id: UCg4B2DxGkt1CEI0gk4mZu1g, name: Market Gabru, group: creator}             # @marketgabru (Harshdeep Singh)
+  - {id: UCzD1jTsHzr283ZF8d6P6d-A, name: The Bald Trader, group: creator}          # NOT @TheBaldTrader (22 subs) - confirm
+  - {id: UCwAdQUuPT6laN-AQR17fe1g, name: Pranjal Kamra, group: creator}
+  - {id: UCe3qdG0A_gr-sEdat5y2twQ, name: CA Rachana Ranade, group: creator}
+  - {id: UCqW8jxh4tH1Z1sWPbkGWL4g, name: Akshat Shrivastava, group: creator}
+  - {id: UCRzYN32xtBf3Yxsx5BvJWJw, name: warikoo, group: creator}
+  # --- news channels ---
+  - {id: UCmRbHAgG2k2vDUvb3xsEunQ, name: CNBC-TV18, group: news}
+  - {id: UChftTVI0QJmyXkajQYt2tiQ, name: moneycontrol, group: news}
+  - {id: UCkXopQ3ubd-rnXnStZqCl2w, name: Zee Business, group: news}
+  - {id: UCI_mwTKUhicNzFrhm33MzBQ, name: ET Now, group: news}
+  - {id: UCQIycDaLsBpMKjOCeaKUYVg, name: CNBC Awaaz, group: news}
+  - {id: UC3uJIdRFTGgLWrUziaHbzrg, name: NDTV Profit, group: news}
+  - {id: UC59YUBhNLMkS2Q8NBWBGHAA, name: Zerodha, group: news}
+
+# Extra words that mark a Google-Trends / Wikipedia entry as in-niche, on top
+# of the built-in finance list (engine/trends/text.py).
+niche_keywords: []
+
+# How much each source counts in the combined score (share of voice).
+weights:
+  news: 1.0       # how much of the business-news flow is about this topic
+  gtrends: 1.0    # how much of India's trending search volume
+  youtube: 1.0    # how much of the watched channels' fresh views (creators x creator_weight)
+
+# Lifecycle thresholds — recent window vs the window before it.
+lifecycle:
+  rising_ratio: 1.3       # recent >= 1.3x previous  -> RISING
+  fading_ratio: 0.7       # recent <= 0.7x previous  -> FADING
+                          # anything in between -> PEAKING ("same")
+  emerging_hours: 12      # EMERGING = first seen within this many hours...
+  emerging_max_breadth: 5 # ...and carried by at most this many publishers/channels (not yet everywhere)
+  dead_hours: 48          # no activity for this long -> dropped from the board

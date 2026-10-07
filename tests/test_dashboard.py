@@ -24,7 +24,7 @@ def test_generate_empty_topic(client):
 
 def test_generate_no_platforms(client, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "x")
-    r = client.post("/api/generate", json={"topic": "hi", "platforms": []})
+    r = client.post("/api/generate", json={"topic": "hello", "platforms": []})
     assert r.status_code == 400 and "platform" in r.get_json()["error"].lower()
 
 
@@ -35,7 +35,7 @@ def test_generate_no_key(client, monkeypatch):
 
     from engine import llm
     importlib.reload(llm)
-    r = client.post("/api/generate", json={"topic": "hi"})
+    r = client.post("/api/generate", json={"topic": "hello"})
     assert r.status_code == 400
 
 
@@ -58,7 +58,8 @@ def test_generate_happy_path_mocked(client, monkeypatch):
     }
     monkeypatch.setattr(app_module.orchestrator, "run",
                         lambda topic, platforms_selected=None, use_search=None,
-                        image_backend=None, image_template=None, formats_map=None: fake)
+                        image_backend=None, image_template=None, formats_map=None,
+                        trend_state=None: fake)
     r = client.post("/api/generate", json={"topic": "monsoon", "platforms": ["twitter"]})
     d = r.get_json()
     assert r.status_code == 200

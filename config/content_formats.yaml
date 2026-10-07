@@ -1,0 +1,102 @@
+# Content generator — the metadata each platform takes for a VIDEO you have
+# already made, with its limits and what actually matters there.
+#
+# fields:  which pieces to produce, with hard limits enforced by code afterwards
+#   titles        n options; max = platform limit, show = what is visible before truncation
+#   description   max = platform limit; hook = characters visible before "more"
+#   tags          backend keyword tags; max_total = combined character limit
+#   hashtags      min/max count
+#   thumbnail_text / cover_text   short words to put ON the image
+#   pinned_comment                first comment to pin
+# rules:   told to the writer. Reviewed 2026-10-06 — platforms change; re-check.
+# suggest: which search-suggestion feed to read (yt = YouTube search, web = Google)
+
+youtube:
+  label: YouTube (long video)
+  suggest: yt
+  fields:
+    titles:         {n: 3, max: 100, show: 60}
+    description:    {max: 5000, hook: 150}
+    tags:           {max_total: 500, max_each: 30, aim: 10}
+    hashtags:       {min: 2, max: 3}
+    thumbnail_text: {n: 3, max_words: 4}
+    pinned_comment: {max: 400}
+  rules:
+    - Title - put the main search phrase in the first 40 characters; keep the whole title under 60 so it is not cut off in search. It must be true to the video - a title that over-promises loses viewers in the first 30 seconds, which is what YouTube now ranks on.
+    - Thumbnail text - 2 to 4 words that ADD to the title, never repeat it. The title and thumbnail together must make one clear promise.
+    - Description - the first 150 characters show before "more" and are read by search - state what the viewer will learn, using the main phrase naturally. Then 2-3 short paragraphs covering the points in the video with the related search phrases worked in. Never invent timestamps or chapter times - write "CHAPTERS (add your timestamps):" followed by the section names only.
+    - Tags - YouTube says tags play a minimal role, mainly for misspellings. Give the main phrase, close variants, common misspellings and the Hindi/Hinglish spelling. No unrelated popular tags.
+    - Hashtags - exactly 2 or 3; the first three show above the title. More than 15 and YouTube ignores all of them.
+    - Pinned comment - one specific question that invites a real answer.
+
+youtube_shorts:
+  label: YouTube Shorts
+  suggest: yt
+  fields:
+    titles:      {n: 3, max: 100, show: 40}
+    description: {max: 500, hook: 100}
+    hashtags:    {min: 2, max: 3}
+    pinned_comment: {max: 300}
+  rules:
+    - Title - under 40 characters shows fully in the Shorts feed. One sharp claim or question with the search phrase in it.
+    - Shorts are ranked on how long people keep watching, not on metadata - the title only has to make the first second make sense.
+    - Description - one or two lines, main phrase once.
+    - Hashtags - 2 or 3 specific ones. "#Shorts" is not needed.
+
+instagram_reel:
+  label: Instagram Reel
+  suggest: web
+  fields:
+    description: {max: 2200, hook: 125, name: Caption}
+    hashtags:    {min: 3, max: 5}
+    cover_text:  {n: 3, max_words: 5}
+  rules:
+    - Caption - the first 125 characters show before "more" - make them a hook that tells a viewer why to keep watching.
+    - Instagram search reads the caption - use the words people would search for in plain sentences; do not stuff keywords.
+    - Write something worth sending to a friend - sends per reach is what takes a Reel beyond followers.
+    - Hashtags - 3 to 5, specific. Five is the platform's hard limit and hashtags do not add reach by themselves.
+    - No links (not clickable). No engagement bait such as "tag a friend" or "comment YES".
+    - Cover text - up to 5 words for the cover image; it is what shows on the profile grid.
+
+facebook:
+  label: Facebook (Reel / video)
+  suggest: web
+  fields:
+    titles:      {n: 2, max: 100, show: 60}
+    description: {max: 2200, hook: 125, name: Caption}
+    hashtags:    {min: 0, max: 3}
+  rules:
+    - Caption - short. The first 125 characters show in feed; say what the video gives the viewer.
+    - Facebook rewards original video and real conversation, and suppresses engagement bait ("like if", "share with", "tag someone") - never use it.
+    - Hashtags - 0 to 3. They do little on Facebook; relevance over quantity.
+    - End with one genuine question to start comments.
+
+twitter:
+  label: X / Twitter (video post)
+  suggest: web
+  fields:
+    description: {max: 280, hook: 100, name: Post text}
+    hashtags:    {min: 0, max: 2}
+  rules:
+    - Post text - 280 characters including hashtags. First sentence is the hook - a number or a claim.
+    - No link in the post - X holds back posts with outside links. Upload the video natively.
+    - End on a specific question - replies are the heaviest ranking signal on X.
+    - Hashtags - at most 2; none is fine.
+
+linkedin:
+  label: LinkedIn (video post)
+  suggest: web
+  fields:
+    description: {max: 3000, hook: 140, name: Post text}
+    hashtags:    {min: 3, max: 5}
+  rules:
+    - Post text - the first line (under 140 characters) is all that shows before "see more". Make it specific.
+    - Then 4-8 short lines on what the video shows and the takeaway for a professional. Reading time is a ranking signal.
+    - No link in the body - put it in the first comment.
+    - End with one question a professional would answer in a sentence or two.
+    - Hashtags - 3 to 5. They label the topic; they do not add reach.
+
+languages:
+  english:  Write in clear Indian English.
+  hinglish: Write in Hinglish - Hindi in Roman script mixed naturally with English finance terms, the way Indian market YouTubers title their videos.
+  hindi:    Write in Hindi (Devanagari), keeping company names and finance terms in English.

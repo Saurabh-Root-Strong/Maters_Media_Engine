@@ -97,6 +97,105 @@ provider-agnostic.
 All platform drafts are produced in a single combined call (fewer tokens than
 one call each). Set spend alerts + a monthly cap in the OpenAI dashboard.
 
+## Trend tracker (left panel)
+
+While the dashboard runs, a background collector reads free public feeds every
+30 minutes — no API key, no LLM — and the left panel shows what is **Emerging /
+Rising / Peaking / Fading** in your niche. Click a topic to use it.
+
+| Source | What it measures |
+|---|---|
+| Google Trends (India "trending now") | search volume per trending query |
+| Google News (business section + your queries) | articles and distinct publishers per story |
+| YouTube channel feeds (your watch-list) | views gained per video between collections |
+| Wikipedia (top pages, India) | daily page views, as confirmation only |
+
+How a state is decided — all in `engine/trends/lifecycle.py`:
+
+- Items are grouped into topics by shared wording (`topics.py`).
+- A topic's score is its **share of voice**: the fraction of each source's
+  activity in a time window that is about it. Raw counts fall every night;
+  a share only moves when the topic really gains or loses ground.
+- The last window is compared with the one before it (9h, widening to 18h or
+  24h when the flow is too thin), using only sources present in both.
+- Rising = share up ≥30%. Fading = down ≥30%. Peaking = anything in between.
+  Emerging = first seen within 6h and carried by ≤5 publishers/channels.
+- **Every 9 hours an update is taken and stored** ("9-hour update" page): each
+  topic classed Trending / Same / Fading, how it moved since the previous
+  update (new, moved up, moved down, dropped off), and how well the window was
+  actually observed. If nothing was collecting when one fell due, a single late
+  update is taken on the next run and marked late — none are back-filled.
+- `python -m engine.trends` runs one cycle without the dashboard; schedule it
+  (Windows Task Scheduler) to keep updates coming while the dashboard is closed.
+- A topic needs two publishers, two channels, or a Google trend to be shown.
+
+Limits worth knowing: grouping is by words, not meaning, so a topic can pick up
+an unrelated headline or a story can stay split in two; collection only happens
+while the app is running; Instagram, Facebook, LinkedIn and Reddit expose no
+usable free trend data and are not covered.
+
+Everything is editable in `config/trends.yaml` (feeds, channels, thresholds).
+Data lives in `data/` (git-ignored):
+
+- `data/trends.db` — items, measurements, topics, every lifecycle change, and a
+  permanent one-row-per-topic-per-day history ("Past days" in the panel).
+- `data/analytics.db` — every post you publish, stamped with the trend state its
+  topic was in, plus the result numbers you enter ("My posts & results"). Over
+  time this shows whether posting on *rising* really beats *peaking* for you.
+
+## Free models (writer fallback chain)
+
+Every writing call can run on a free model first and fall back to a paid one
+only when the free one is rate-limited or down. Set in `.env`:
+
+```
+GEMINI_API_KEY=...            # free, no card
+MEDIA_ENGINE_WRITERS=gemini:gemini-3.5-flash-lite,gemini:gemini-flash-latest,openai:gpt-4o-mini
+```
+
+Any OpenAI-compatible provider works (`gemini`, `openrouter`, `groq`,
+`deepseek`, `kimi`, `mistral`, plus `openai` and `anthropic`). The dashboard
+shows which model wrote each result and which were skipped. Free tiers may use
+your prompts to improve their products, and their limits and model lists change
+without notice — see `.env.example` for what was measured and when. Live web
+research still uses OpenAI: Gemini's search grounding refused a free-tier key.
+
+## Content generator (packaging a video you already made)
+
+Left menu → **Content generator**. Pick the platform (YouTube, Shorts, Instagram
+Reel, Facebook, X, LinkedIn), say in one line what the video is about, list
+what it covers, and get the title options, description/caption, tags, hashtags,
+thumbnail text and pinned comment in that platform's format and limits
+(`config/content_formats.yaml`).
+
+- **Analyse trends (free, no LLM)** — what the trend store knows about the
+  subject: live state, competing videos ranked by views per hour, recent
+  headlines, word pairs in use, items per day, earlier days on the board, plus
+  live YouTube/Google search suggestions (the wording viewers actually type).
+- **Suggest** — one LLM call writes the package from that evidence. Code then
+  enforces the hard limits, and lints the copy for filler, thumbnail text that
+  repeats the title, and figures that are not in your notes; a failed lint
+  triggers one automatic rewrite, and anything still wrong is shown.
+
+The package only describes what you list in the notes box — leave it empty and
+the copy stays general.
+
+## Writing for the ranking algorithms
+
+`config/algorithms.yaml` holds what each platform's ranking is known to reward,
+every rule tagged `official` / `code` / `reported` / `heuristic` so it is clear
+how solid it is. Algorithms change — re-check it every few months.
+
+- **Drafting** — the platform's rules are added to the writing prompt (no link
+  in the body on X and LinkedIn, hook in the first line, end on a real question,
+  hashtag limits, no engagement bait).
+- **Algorithm fit** — every draft is checked by code against those rules and
+  gets a 0-100 score with the reasons, shown on its card. Advisory only: it
+  never blocks a post; the review gate decides that.
+- **Trend stage** — a topic picked from the trend board carries its stage into
+  angle selection: rising gets the timely take, peaking a contrarian one,
+  fading a "what happens next".
+
 ## Tests
 
 ```bash
@@ -105,8 +204,9 @@ pytest
 ```
 
 Offline suite (LLM mocked, no API cost) covering the policy scenario matrix,
-the review gate, the scheduler, publishers, the manifest, and dashboard
-enforcement.
+the review gate, the scheduler, publishers, the manifest, dashboard
+enforcement, and the trend tracker (parsers, topic grouping, lifecycle maths,
+collection with injected feeds, the analytics store).
 
 ## Roadmap
 

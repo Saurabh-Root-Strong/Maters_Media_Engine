@@ -11,9 +11,12 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from datetime import datetime, timezone
 
 import yaml
+
+_history_lock = threading.Lock()
 
 _BRAND_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "brand.yaml")
 _HISTORY_PATH = os.path.join(os.path.dirname(__file__), "..", "output", "history.json")
@@ -56,21 +59,30 @@ def recent_topics(n: int = 30) -> list[str]:
     try:
         with open(_HISTORY_PATH, encoding="utf-8") as f:
             data = json.load(f)
-        return [e["topic"] for e in data.get("entries", [])][-n:]
-    except (OSError, ValueError):
+        # De-duplicate (keeping the latest occurrence) so a topic regenerated
+        # ten times doesn't crowd nine others out of the avoid-list.
+        seen: dict[str, None] = {}
+        for e in reversed(data.get("entries", [])):
+            seen.setdefault(e["topic"], None)
+        return list(reversed(seen))[-n:]
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
         return []
 
 
 def record_topic(topic: str) -> None:
-    try:
-        with open(_HISTORY_PATH, encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, ValueError):
-        data = {"entries": []}
-    data.setdefault("entries", []).append(
-        {"topic": topic, "at": datetime.now(timezone.utc).isoformat()}
-    )
-    data["entries"] = data["entries"][-200:]  # cap
-    os.makedirs(os.path.dirname(_HISTORY_PATH), exist_ok=True)
-    with open(_HISTORY_PATH, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    # Read-modify-write: two concurrent dashboard runs would drop an entry.
+    with _history_lock:
+        try:
+            with open(_HISTORY_PATH, encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            data = {"entries": []}
+        if not isinstance(data, dict):
+            data = {"entries": []}
+        data.setdefault("entries", []).append(
+            {"topic": topic, "at": datetime.now(timezone.utc).isoformat()}
+        )
+        data["entries"] = data["entries"][-200:]  # cap
+        os.makedirs(os.path.dirname(_HISTORY_PATH), exist_ok=True)
+        with open(_HISTORY_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)

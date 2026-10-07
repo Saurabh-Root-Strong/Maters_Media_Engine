@@ -8,12 +8,14 @@ returned result dict (drafts + review verdict + image).
 from __future__ import annotations
 
 import os
+import time
 
 from . import angle as angle_stage
-from . import drafters, imagegen, research, review
+from . import drafters, imagegen, memory, research, review
 from .drafters import _load_platforms
 
 _OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "output")
+_MAX_REVISE_ROUNDS = 2
 
 
 def _slug(topic: str) -> str:
@@ -24,7 +26,7 @@ def _slug(topic: str) -> str:
 def run(topic: str, platforms_selected: list[str] | None = None,
         use_search: bool | None = None, image_backend: str | None = None,
         image_template: str | None = None, formats_map: dict | None = None,
-        on_progress=None) -> dict:
+        on_progress=None, trend_state: str | None = None) -> dict:
     def note(msg: str) -> None:
         if on_progress:
             on_progress(msg)
@@ -33,7 +35,7 @@ def run(topic: str, platforms_selected: list[str] | None = None,
     brief = research.research(topic, use_search=use_search)
 
     note("Choosing the angle...")
-    angle = angle_stage.choose(brief)
+    angle = angle_stage.choose(brief, trend_state)
 
     platforms = _load_platforms()
 
@@ -41,13 +43,29 @@ def run(topic: str, platforms_selected: list[str] | None = None,
     note("Drafting selected platforms...")
     drafts = drafters.draft_all(brief, angle, platforms_selected, formats_map)
 
-    # Auto-revise: one re-draft per platform that breaks a hard limit (same template).
-    violations = review.hard_violations(review.validate(drafts, platforms))
-    if violations:
+    # Auto-revise: re-draft each platform that breaks a hard limit (same
+    # template), re-checking after every round. Capped so a model that keeps
+    # overshooting can't loop — a survivor lands as REVISE at the gate.
+    for _ in range(_MAX_REVISE_ROUNDS):
+        violations = review.hard_violations(review.validate(drafts, platforms))
+        if not violations:
+            break
         note(f"Auto-revising: {', '.join(violations)}...")
         for key, issues in violations.items():
             drafts[key] = drafters.redraft(key, platforms[key], brief, angle, issues,
                                            fmt_id=formats_map.get(key))
+
+    # Last resort for a post still over its limit: drop hashtags, where the
+    # platform allows none. They are appended to the text and count toward the
+    # limit, and on X they add no reach — so trimming them is free, whereas
+    # trimming the sentence would change what it says.
+    for key, draft in drafts.items():
+        spec = platforms.get(key, {})
+        cap = spec.get("caption_max_chars")
+        if not cap or spec.get("hashtags_min", 0) > 0:
+            continue
+        while draft.get("hashtags") and review.char_count(review.post_text(draft), spec) > cap:
+            draft["hashtags"] = draft["hashtags"][:-1]
 
     note("Reviewing (limits + facts + sensitivity)...")
     gate = review.review(brief, angle, drafts, platforms)
@@ -66,7 +84,9 @@ def run(topic: str, platforms_selected: list[str] | None = None,
     if image_platforms:
         primary = "instagram" if "instagram" in image_platforms else image_platforms[0]
         note("Rendering the image...")
-        out_path = os.path.join(_OUT_DIR, f"{_slug(topic)}.png")
+        # Timestamped: an approved manifest / scheduled job points at this
+        # file, so regenerating the same topic must not overwrite it.
+        out_path = os.path.join(_OUT_DIR, f"{_slug(topic)}-{time.strftime('%Y%m%d-%H%M%S')}.png")
         try:
             result["image"] = imagegen.generate(drafts[primary], angle, out_path,
                                                  use_backend=image_backend, brief=brief,
@@ -76,4 +96,7 @@ def run(topic: str, platforms_selected: list[str] | None = None,
             result["image_error"] = str(exc)
             result["image_platforms"] = image_platforms
 
+    # Recorded here, not in a caller, so dashboard, CLI and queue runs all feed
+    # the trending suggester's avoid-list.
+    memory.record_topic(topic)
     return result
