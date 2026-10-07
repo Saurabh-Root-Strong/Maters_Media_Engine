@@ -8,6 +8,7 @@
 #   hashtags      min/max count
 #   thumbnail_text / cover_text   short words to put ON the image
 #   pinned_comment                first comment to pin
+#   hooks         n alternative opening lines to test (caption platforms); max = characters
 # rules:   told to the writer. Reviewed 2026-10-06 — platforms change; re-check.
 # suggest: which search-suggestion feed to read (yt = YouTube search, web = Google)
 
@@ -47,6 +48,7 @@ instagram_reel:
   label: Instagram Reel
   suggest: web
   fields:
+    hooks:       {n: 3, max: 125}
     description: {max: 2200, hook: 125, name: Caption}
     hashtags:    {min: 3, max: 5}
     cover_text:  {n: 3, max_words: 5}
@@ -63,6 +65,7 @@ facebook:
   suggest: web
   fields:
     titles:      {n: 2, max: 100, show: 60}
+    hooks:       {n: 3, max: 125}
     description: {max: 2200, hook: 125, name: Caption}
     hashtags:    {min: 0, max: 3}
   rules:
@@ -75,6 +78,7 @@ twitter:
   label: X / Twitter (video post)
   suggest: web
   fields:
+    hooks:       {n: 3, max: 100}
     description: {max: 280, hook: 100, name: Post text}
     hashtags:    {min: 0, max: 2}
   rules:
@@ -87,6 +91,7 @@ linkedin:
   label: LinkedIn (video post)
   suggest: web
   fields:
+    hooks:       {n: 3, max: 140}
     description: {max: 3000, hook: 140, name: Post text}
     hashtags:    {min: 3, max: 5}
   rules:

@@ -87,7 +87,11 @@
   .move.fresh { color:#58a6ff; border-color:#58a6ff; }
   .move.upm { color:var(--ok); border-color:var(--ok); } .move.downm { color:var(--bad); border-color:var(--bad); }
   .col.c-TRENDING{border-top-color:var(--ok);} .col.c-SAME{border-top-color:var(--warn);}
-  .st-TRENDING{color:var(--ok);} .st-SAME{color:var(--warn);}
+  .st-TRENDING{color:var(--ok);} .st-SAME{color:var(--warn);} .st-STEADY{color:#58a6ff;} .st-DORMANT{color:var(--dim);}
+  .pulsebox { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-top:8px; background:var(--bg); }
+  .pulsebox .big { font-size:17px; font-weight:700; }
+  .mini { display:flex; align-items:center; gap:10px; margin-top:8px; font-size:13px; }
+  .mini svg { flex:none; }
   @media (max-width:900px) { #up-board { grid-template-columns:1fr !important; } }
   /* --- creator pulse --- */
   .pulse { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:16px; }
@@ -816,8 +820,9 @@ function evidenceHtml(d){
   const ev = d.evidence, st = d.strategy, now = ev.now;
   const sec = (title, body)=> body ? `<div class="cg-sec"><h4>${title}</h4>${body}</div>` : "";
   return `<div class="cg-box"><h3>What the data says</h3>
-    <div class="cg-read">${now?`<b class="st-${esc(now.state)}">${esc(STATE_NAME[now.state]||now.state)}</b> · `:""}${esc(st.headline)}</div>
+    <div class="cg-read">${st.state?`<b class="st-${esc(st.state)}">${esc(STATE_NAME[st.state]||PULSE_NAME[st.state]||st.state)}</b> · `:""}${esc(st.headline)}</div>
     ${st.notes.map(n=>`<div class="tp-sig">• ${esc(n)}</div>`).join("")}
+    ${pulseHtml(ev.lookup)}
     ${sec(`What people type — ${esc(ev.suggest_feed||"search")} suggestions`,
       (ev.searches||[]).map(s=>`<span class="cg-chip">${esc(s)}</span>`).join(""))}
     ${sec("Trending on Google India right now",
@@ -834,6 +839,49 @@ function evidenceHtml(d){
       (ev.past||[]).slice(0,8).map(x=>`<div class="cg-line"><span class="num">${esc(x.day.slice(5))}</span><span><span class="st-${esc(x.state)}">${esc(STATE_NAME[x.state]||x.state)}</span> · ${x.mentions} items</span></div>`).join(""))}
   </div>`;
 }
+const PULSE_NAME = {TRENDING:"Trending", STEADY:"Steady (evergreen)", FADING:"Fading", DORMANT:"Dormant"};
+function line(vals, w, h){
+  const pts = vals.map((v,i)=>[i,v]); if (pts.length < 2) return "";
+  const max = Math.max(...vals) || 1, n = vals.length - 1;
+  const d = pts.map(p=>`${(p[0]/n*w).toFixed(1)},${(h-1-(p[1]/max)*(h-2)).toFixed(1)}`).join(" ");
+  return `<svg width="${w}" height="${h}"><polyline points="${d}" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
+}
+// This topic's own lines, looked up live — works for any subject, tracked or not.
+function pulseHtml(L){
+  if (!L) return "";
+  const v = L.verdict || {}, n = L.news, w = L.interest, y = L.youtube;
+  if (!v.state && !n && !w && !y) return "";
+  let h = `<div class="cg-sec"><h4>This topic's own trend — looked up live${(L.cached||[]).length?` <span style="text-transform:none;letter-spacing:0">(cached: ${L.cached.map(esc).join(", ")})</span>`:""}</h4><div class="pulsebox">`;
+  if (v.state) h += `<div class="big st-${esc(v.state)}">${esc(PULSE_NAME[v.state]||v.state)}</div>`;
+  if (w) h += `<div class="mini"><span class="st-${esc(v.state||"STEADY")}">${line(w.daily, 150, 30)}</span>
+      <span><b>Reader interest, 60 days</b> — Wikipedia “<a href="${esc(w.url)}" target="_blank" rel="noopener">${esc(w.article)}</a>”<br>
+      <span class="tp-sig">${w.last7.toLocaleString()} a day this week vs ${w.prev7.toLocaleString()} last week · peak ${w.peak.toLocaleString()} on ${esc(w.peak_day)}</span></span></div>`;
+  if (n && n.daily && n.daily.length > 1) h += `<div class="mini"><span class="st-${esc(v.state||"STEADY")}">${line(n.daily, 150, 30)}</span>
+      <span><b>News articles per day, ${n.days_covered} days</b><br>
+      <span class="tp-sig">${n.capped?"100+":n.articles} articles · ${n.publishers} publishers · ${n.per_day_recent} a day lately vs ${n.per_day_prior} before</span></span></div>`;
+  else if (n) h += `<div class="mini"><span><b>News:</b> ${n.articles} article${n.articles==1?"":"s"} in the last 30 days</span></div>`;
+  h += `</div>`;
+  if (n && n.headlines && n.headlines.length) h += `<div class="cg-sec"><h4>Latest headlines on it</h4>${n.headlines.slice(0,5).map(x=>
+      `<div class="cg-line"><span>${esc(x.title)}<br><span class="tp-sig">${esc(x.publisher||"")} · ${ago(x.at)}</span></span></div>`).join("")}</div>`;
+  if (y && y.videos && y.videos.length) {
+    const mix = y.top_kind_mix || {};
+    h += `<div class="cg-sec"><h4>What is winning across all of YouTube — last 30 days</h4>
+      <div class="tp-sig">${y.found} videos found · top 10: ${mix.long||0} long, ${mix.short||0} Shorts, ${mix.live||0} live · median title ${y.median_title_chars} characters · ${Math.round((y.hindi_title_share||0)*100)}% Hindi-script titles · ${y.uploads_last_7d} uploaded this week</div>
+      ${y.videos.map(x=>`<div class="cg-line"><span class="num">${x.views.toLocaleString()}</span>
+        <span><a href="${esc(x.url)}" target="_blank" rel="noopener" style="color:inherit">${esc(x.title)}</a><br>
+        <span class="tp-sig">${esc(x.channel)} · ${x.kind==="short"?"Short":x.kind} · ${x.age_days} days old · ${x.views_per_hour.toLocaleString()} views/h · ${x.title_chars} chars</span></span></div>`).join("")}
+      ${(y.phrases||[]).length?`<div style="margin-top:6px">${y.phrases.map(q=>`<span class="cg-chip">${esc(q.phrase)} · ${q.count}</span>`).join("")}</div>`:""}</div>`;
+  } else if (L.youtube_note) h += `<div class="tp-sig" style="margin-top:8px">${esc(L.youtube_note)}</div>`;
+  if ((L.errors||[]).length) h += `<div class="tp-sig" style="margin-top:6px">Could not reach: ${L.errors.map(esc).join(", ")}</div>`;
+  return h + `</div>`;
+}
+function planHtml(pl){
+  if (!pl) return "";
+  const row = (k, v)=> v ? `<div class="cg-line"><span class="num" style="min-width:118px">${k}</span><span>${esc(v)}</span></div>` : "";
+  return `<div class="cg-sec"><h4>Strategy — decided from the evidence before writing</h4>
+    ${row("Who is searching", pl.audience_intent)}${row("The angle", pl.angle)}${row("The promise", pl.promise)}
+    ${row("Lead keyword", pl.primary_keyword)}${row("Also work in", (pl.secondary_keywords||[]).join(" · "))}${row("Stay away from", pl.avoid)}</div>`;
+}
 function packageHtml(d){
   const p = d.package, f = d.fields, descName = (f.description && f.description.name) || "Description";
   const sec = (title, extra, body)=> `<div class="cg-sec"><h4>${title} ${extra||""}</h4>${body}</div>`;
@@ -842,6 +890,10 @@ function packageHtml(d){
   if (warns.length) h += `<div class="tp-warn">⚠ ${warns.map(esc).join("<br>⚠ ")}</div>`;
   h += writerLine(d);
   if (d.revised) h += `<div class="tp-sig">The first draft had weak spots (filler, repeated thumbnail text or figures not in your notes) and was rewritten once automatically.</div>`;
+  h += planHtml(d.plan);
+  if (p.hooks && p.hooks.length) h += sec("Opening line — 3 to choose from", "", p.hooks.map(t=>`<div class="cg-item">
+      <div class="txt">${esc(t.text)}</div>
+      <div class="tp-sig"><span class="${t.over_limit?"down":"up"}">${t.chars} / ${f.hooks.max} chars</span> · ${esc(t.why)} ${copyBtn(t.text)}</div></div>`).join(""));
   if (p.titles) h += sec("Title options", "", p.titles.map(t=>`<div class="cg-item">
       <div class="txt">${esc(t.text)}</div>
       <div class="tp-sig"><span class="${t.over_limit?"down":t.truncated_in_search?"flat":"up"}">${t.chars} / ${f.titles.max} chars${t.over_limit?" — over the limit":t.truncated_in_search?` — will be cut after ~${f.titles.show} in search`:""}</span>
@@ -862,7 +914,8 @@ async function runContent(analyseOnly){
   $("cg-err").style.display = "none";
   if (!topic) { $("cg-err").textContent = "Say what the video is about."; $("cg-err").style.display = "block"; return; }
   $("cg-analyse").disabled = $("cg-go").disabled = true;
-  $("cg-status").textContent = analyseOnly ? "Reading the trend store…" : "Analysing, then writing — about 15 seconds…";
+  $("cg-status").textContent = analyseOnly ? "Looking the topic up — news, reader interest, YouTube…"
+    : "Researching the topic, planning the strategy, then writing — about 20–30 seconds…";
   try {
     const d = await api("/api/content", {platform:$("cg-platform").value, language:$("cg-lang").value,
       topic, notes:$("cg-notes").value, analyse_only:analyseOnly});

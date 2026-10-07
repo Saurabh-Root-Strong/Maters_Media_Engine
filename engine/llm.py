@@ -198,8 +198,13 @@ def _compat(provider: str):
         # The paid default waits and retries hard. A free tier that is
         # overloaded must fail fast so the chain moves on — retrying a 503
         # cost over two minutes on one call before this was tightened.
-        kwargs = {"api_key": os.environ.get(cfg["key"]), "timeout": 120.0 if paid else 45.0,
-                  "max_retries": 4 if paid else 0}
+        import httpx
+        # Separate CONNECT timeout: when the network is down every attempt
+        # would otherwise wait the full read timeout — measured at over ten
+        # minutes for one request across the chain before this was added.
+        kwargs = {"api_key": os.environ.get(cfg["key"]),
+                  "timeout": httpx.Timeout(120.0 if paid else 45.0, connect=8.0),
+                  "max_retries": 2 if paid else 0}
         if cfg["base"]:
             kwargs["base_url"] = cfg["base"]
         _compat_clients[provider] = OpenAI(**kwargs)

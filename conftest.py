@@ -30,3 +30,12 @@ def _isolate_output(tmp_path, monkeypatch):
     monkeypatch.setattr(sched_mod, "_DIR", str(tmp_path / "scheduled"))
     monkeypatch.setattr(trend_store, "DB_PATH", str(tmp_path / "trends.db"))
     monkeypatch.setattr(analytics, "DB_PATH", str(tmp_path / "analytics.db"))
+
+    # The content generator looks every topic up live (news, Wikipedia,
+    # YouTube). Tests must not: give it an empty result unless a test installs
+    # its own. Tests of the lookup module itself import it directly.
+    import types
+
+    from engine import content
+    monkeypatch.setattr(content, "lookup", types.SimpleNamespace(
+        research=lambda topic, **kw: {"topic": topic, "errors": [], "verdict": {}}))

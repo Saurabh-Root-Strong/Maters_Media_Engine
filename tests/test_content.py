@@ -11,6 +11,9 @@ from engine.trends import insight, service, store
 from tests.test_trends import CFG, H, NOW, _filler, _story, fetcher
 
 JIO = "Jio Platforms IPO valuation soars"
+PLAN = {"audience_intent": "retail investors asking who qualifies", "angle": "eligibility, not valuation",
+        "promise": "know if you qualify", "primary_keyword": "jio ipo shareholder quota",
+        "secondary_keywords": ["jio ipo price band"], "specific_hashtags": ["JioIPO"], "avoid": "valuation hype"}
 insight._real = insight.analyse      # kept so a test can re-point analyse() at the fixed test clock
 
 
@@ -136,7 +139,7 @@ def test_strategy_follows_the_trend_stage():
     assert read("PEAKING", 4)["mode"] == "angle"
     assert read("FADING", -60)["mode"] == "search" and "-60%" in read("FADING", -60)["headline"]
     assert content.strategy({**base, "now": None})["mode"] == "search"
-    assert "Nothing on this subject" in content.strategy({"matched": 0})["headline"]
+    assert "Nothing found on this subject" in content.strategy({"matched": 0})["headline"]
 
 
 def test_strategy_admits_thin_history():
@@ -241,19 +244,25 @@ def test_clean_copy_passes_lint():
 
 def test_generate_rewrites_once_when_lint_fails_and_reports_what_remains(monkeypatch):
     drafts = iter([
-        {"description": "Discover everything about Jio.", "hashtags": ["Jio"]},      # weak
-        {"description": "Still gaining momentum, sadly.", "hashtags": ["Jio"]},       # still weak
+        {"description": "Discover everything about Jio.", "hashtags": ["Jio"], "hooks": []},      # weak
+        {"description": "Still gaining momentum, sadly.", "hashtags": ["Jio"], "hooks": []},       # still weak
     ])
     prompts = []
-    monkeypatch.setattr(content.llm, "structured",
-                        lambda s, u, sc, max_tokens=0: prompts.append(u) or next(drafts))
+
+    def fake(s, u, sc, max_tokens=0):
+        if "audience_intent" in sc["properties"]:        # the planning step, not a draft
+            return PLAN
+        prompts.append(u)
+        return next(drafts)
+    monkeypatch.setattr(content.llm, "structured", fake)
     out = content.generate("twitter", "Jio IPO", fetch=suggest_fetch)
     assert len(prompts) == 2 and "Discover everything" in prompts[1] and "Fix exactly these" in prompts[1]
+    assert "STRATEGY TO EXECUTE" in prompts[0] and "who qualifies" in prompts[0]      # the plan reaches the writer
+    assert out["plan"] == PLAN
     assert out["revised"] is True and any("gaining momentum" in q for q in out["quality_notes"])
 
     prompts.clear()
-    monkeypatch.setattr(content.llm, "structured",
-                        lambda s, u, sc, max_tokens=0: prompts.append(u) or {"description": "Jio lists Friday.", "hashtags": []})
+    drafts = iter([{"description": "Jio lists Friday.", "hashtags": ["JioIPO"], "hooks": []}])
     out = content.generate("twitter", "Jio IPO", fetch=suggest_fetch)
     assert len(prompts) == 1 and out["revised"] is False and out["quality_notes"] == []
 
