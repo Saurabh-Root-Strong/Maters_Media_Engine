@@ -194,6 +194,9 @@ def test_every_platform_has_a_usable_spec():
 
 def test_generate_feeds_evidence_and_rules_to_the_writer_and_saves(monkeypatch):
     board = _seed()
+    # generate() reads the real clock; the seed sits at a fixed date, which would
+    # otherwise fall outside the 30-day lookback as the calendar moves on
+    monkeypatch.setattr(insight.time, "time", lambda: NOW)
     seen = {}
 
     def fake(system, user, schema, max_tokens=0):

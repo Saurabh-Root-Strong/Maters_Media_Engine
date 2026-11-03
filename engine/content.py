@@ -23,8 +23,9 @@ from contextlib import closing
 
 import yaml
 
-from . import analytics, llm, memory
+from . import algo, analytics, llm, memory
 from .trends import insight, lookup
+from .trends.text import tokens as _tokens
 
 _PATH = os.path.join(os.path.dirname(__file__), "..", "config", "content_formats.yaml")
 
@@ -57,6 +58,30 @@ def languages() -> list[str]:
 
 # --- what the trend stage means for packaging ----------------------------------
 
+_SHARE_TYPES = {"mood", "humour"}
+
+# How to package each kind of content. Search-led copy on a mood reel, or a
+# feelings caption on a results explainer, both miss what the viewer came for.
+_PLAYBOOK = {
+    "mood": "MOOD / EMOTIONAL. It spreads by people sending it, not by search. Lead with its core line or the "
+            "feeling, in the viewer's own words. Make someone think 'this is about me' or 'I must send this to "
+            "him'. Promise nothing it does not give: no 'learn', 'how to', 'tips', 'guide', and no title posing a "
+            "debate or claim the video does not take up. Do not explain it. Short. End on a question people can "
+            "answer from their own life; never ask them to tag, share or like. Search words only where natural.",
+    "humour": "HUMOUR. It spreads by people sending it. Set up the joke, never explain it. Short. No lessons.",
+    "news_explainer": "NEWS EXPLAINER. It wins on speed and clarity. Lead with the specific event and number, then "
+                      "the so-what. Use the search phrase people type today.",
+    "education": "EDUCATION. It wins on search and saves. Lead with the exact question or outcome. Say what the viewer "
+                 "will be able to do. Worth saving for later.",
+    "stock_analysis": "STOCK ANALYSIS. It wins on a specific, checkable view, and carries regulatory risk. Name the "
+                      "subject. Never repeat buy/sell calls, targets or stop-losses in the copy; frame it as "
+                      "analysis and add a short educational-only line.",
+    "story": "STORY. It wins on tension. Open on the moment things turned, not the background. Do not give the ending "
+             "away in the title.",
+    "interview": "INTERVIEW. It wins on the guest's single strongest claim, attributed to them by name.",
+    "promo": "PROMOTION. Say plainly what is being offered and why it matters now. Disclose any paid relationship.",
+}
+
 _LOOKUP_READ = {
     "TRENDING": ("news", "Interest in this subject is rising right now. Publish soon and lead with the "
                          "wording people are searching today."),
@@ -81,7 +106,14 @@ def strategy(evidence: dict) -> dict:
         return {"mode": "search", "notes": [], "state": None,
                 "headline": "That topic has no words to look up (only symbols or filler words). "
                             "Name the subject — a company, an event, a number."}
-    if now:
+    if evidence.get("content_type") in _SHARE_TYPES and not now:
+        # Trend lines measure a topic. A feeling spreads through people sending
+        # it, and "low search interest" says nothing about whether it will.
+        state, mode = "EVERGREEN", "share"
+        headline = ("A feeling, not a news topic: it does not depend on the news cycle and can be posted any "
+                    "time. It spreads when people send it and save it, so the opening line has to make someone "
+                    "think of one specific person.")
+    elif now:
         # On the live board of the tracked niche: the most precise read there is.
         state = now["state"]
         v = now["velocity_pct"]
@@ -441,7 +473,12 @@ def _proper_names(evidence: dict | None, topic: str) -> dict[str, str]:
     ("harshad" -> "Harshad"), taken from the matched Wikipedia article title."""
     title = (((evidence or {}).get("lookup") or {}).get("interest") or {}).get("article") or ""
     wanted = {w for w in re.findall(r"\w+", topic.lower()) if len(w) > 2}
-    return {w.lower(): w for w in re.findall(r"\w+", title) if w.lower() in wanted and w != w.lower()}
+    words = re.findall(r"\w+", title)
+    # "Harshad Mehta" is a name. "Technical analysis" and "Price of oil" are
+    # sentence case: the first capital says nothing, and "technical" in a
+    # sentence is correct. All-capitals ("ITC") is always a name.
+    named = len(words) >= 2 and all(w[0].isupper() for w in words)
+    return {w.lower(): w for w in words if w.lower() in wanted and w != w.lower() and (named or w.isupper())}
 
 
 # Talk about the research itself — reader counts, view rates, what creators are doing.
@@ -449,6 +486,11 @@ _RESEARCH_TALK = re.compile(
     r"\bviews? (per|an|a) (hour|day)\b|\b(readers?|searches) (a|per) day\b|\bdaily (readers?|searches|views)\b"
     r"|\bcreator videos?\b|\bsearch (volume|suggestions?|data)\b|\btop[- ]ranking quer\w+\b"
     r"|\b(people|viewers|traders|investors) are (searching|googling)\b", re.I)
+# "Tag a friend" and friends: Meta and LinkedIn detect it and cut reach. Hinglish too.
+_HINGLISH_BAIT = re.compile(r"\b(tag|share|follow|like)\s+(karo|kro|kariye|kijiye|karein|kardo|kar\s+do)\b", re.I)
+_PRODUCTION_TALK = re.compile(
+    r"\b(footage|atmospheric|on-?screen|voice-?over|b-?roll|handle logo|night[- ]drive"
+    r"|this (reel|short|clip) (captures|shows|features|displays))\b", re.I)
 _OTHER_LANGUAGE = {"english": re.compile(r"\bin hindi\b|\bhindi me(in)?\b|\bkya (tha|hai)\b|\bkab hua\b", re.I)}
 
 
@@ -464,7 +506,8 @@ def lint(package: dict, topic: str, notes: str, evidence: dict | None = None,
     for t in titles:
         if _WEAK_OPENER.search(t):
             issues.append(f"Title “{t}” opens with a filler word — start with the subject or the question.")
-        if t and t == t.lower() and any(c.isascii() and c.isalpha() for c in t):
+        # (Devanagari has no capitals, so a Hindi title with an English word in it is fine.)
+        if t and t == t.lower() and t.isascii() and any(c.isalpha() for c in t):
             issues.append(f"Title “{t}” is all lower-case like a raw search query — write it as a proper title.")
     seen = set()
     for m in _FILLER.finditer("\n".join(text_fields)):
@@ -480,6 +523,27 @@ def lint(package: dict, topic: str, notes: str, evidence: dict | None = None,
             if any(len(words & tw) >= 2 for tw in title_words):
                 issues.append(f"{key.replace('_', ' ').capitalize()} “{option}” repeats the title's words — "
                               "give the stake or the emotion instead.")
+
+    bait_text = "\n".join(text_fields)
+    bait = algo._BAIT.search(bait_text) or _HINGLISH_BAIT.search(bait_text)
+    if bait:
+        issues.append(f"“{bait.group(0)}” is engagement bait, which platforms detect and cut reach for. Ask a real "
+                      "question instead.")
+
+    # Describing how it was made instead of what it gives the viewer.
+    m = _PRODUCTION_TALK.search(joined_all := "\n".join(text_fields))
+    if m:
+        issues.append(f"“{m.group(0)}” describes how the post was made. Say what it means to the viewer instead.")
+    # The same search phrase twice in one line reads like spam, not like a person.
+    for line in titles + hooks:
+        words = [w for w in re.findall(r"\w+", line.lower()) if w not in _SMALL]
+        twice = [f"{a} {b}" for a, b in zip(words, words[1:]) if sum(1 for x in zip(words, words[1:]) if x == (a, b)) > 1]
+        if twice:
+            issues.append(f"“{line[:70]}” repeats “{twice[0]}” — write it the way a person would say it.")
+            break
+    pinned = package.get("pinned_comment") or ""
+    if pinned and "?" not in pinned:
+        issues.append("The pinned comment should ask one real question; a statement gives nobody a reason to reply.")
 
     # Research figures leaking into the copy ("1,401 daily readers are searching…").
     joined = "\n".join(text_fields)
@@ -524,7 +588,8 @@ def lint(package: dict, topic: str, notes: str, evidence: dict | None = None,
     # manipulation" that never says "Harshad Mehta" cannot be found by anyone
     # searching for him — and search is where an evergreen video lives.
     named = {w for w in re.findall(r"\w+", topic.lower()) if len(w) > 2 and w not in _GENERIC_SUBJECT}
-    if named:
+    # (A feeling has no name to search for; its copy lives on the line, not the keyword.)
+    if named and (evidence or {}).get("content_type") not in _SHARE_TYPES:
         def names_it(text: str) -> bool:
             low = text.lower()
             return any(w in low for w in named)
@@ -562,37 +627,95 @@ def lint(package: dict, topic: str, notes: str, evidence: dict | None = None,
 
 # --- public --------------------------------------------------------------------
 
-def analyse(platform: str, topic: str, board: dict | None = None, fetch=None) -> dict:
+def _research(topic: str, terms: list[str], kwargs: dict) -> dict:
+    """Look the subject up under what people really search. A second term is
+    only spent (a YouTube search costs quota) when the first finds little."""
+    best, score = None, -1
+    for term in (terms[:2] or [topic]):
+        look = lookup.research(term, **kwargs)
+        found = ((look.get("youtube") or {}).get("found") or 0) + ((look.get("news") or {}).get("articles") or 0)
+        if found > score:
+            best, score = {**look, "term": term}, found
+        if score >= 5:
+            break
+    return best
+
+
+def analyse(platform: str, topic: str, board: dict | None = None, fetch=None, media: dict | None = None) -> dict:
     """The free half: evidence + the trend read, no LLM."""
     spec = formats().get(platform)
     if not isinstance(spec, dict) or "fields" not in spec:
         raise ValueError(f"unknown platform {platform!r}")
     kwargs = {"fetch": fetch} if fetch else {}
+    seen = (media or {}).get("seen") or {}
+    terms = [t for t in seen.get("search_terms", []) if _tokens(t)]
     evidence = insight.analyse(topic, board=board, suggest_feed=spec.get("suggest"), **kwargs)
+    evidence["content_type"] = seen.get("content_type")
     # The tracker only knows its own beat. Look this one subject up live as
     # well — news, reader interest and YouTube — so any topic, however old or
     # narrow, gets its own trend read.
     if evidence.get("searchable") is not False:
         try:
-            evidence["lookup"] = lookup.research(topic, **kwargs)
+            evidence["lookup"] = _research(topic, terms, kwargs)
         except Exception as exc:  # noqa: BLE001 — never lose the rest of the analysis over it
             evidence["lookup"] = {"errors": [f"lookup: {type(exc).__name__}"]}
+        # What people type, for every phrase the subject goes by.
+        merged = list(evidence.get("searches") or [])
+        for term in terms[:3]:
+            for q in insight.suggest(term, spec.get("suggest") or "web", **kwargs):
+                if q not in merged:
+                    merged.append(q)
+        if merged:
+            evidence["searches"] = merged[:15]
+            evidence.setdefault("suggest_feed", "YouTube search" if spec.get("suggest") == "yt" else "Google search")
     return {"platform": platform, "label": spec["label"], "evidence": evidence,
             "strategy": strategy(evidence)}
 
 
 def generate(platform: str, topic: str, notes: str = "", language: str = "english",
-             board: dict | None = None, fetch=None) -> dict:
+             board: dict | None = None, fetch=None, media_id: str | None = None, owner: str = "mine") -> dict:
     """Evidence + the written package for `platform`."""
-    out = analyse(platform, topic, board, fetch)
+    # A linked or uploaded post that was actually looked at (engine/media.py).
+    from . import media as media_mod
+    seen_media = media_mod.load(media_id) if media_id else None
+    seen = (seen_media or {}).get("seen") or {}
+    out = analyse(platform, topic, board, fetch, media=seen_media)
     spec = formats()[platform]
     user = (
         f"THE VIDEO IS ABOUT: {topic.strip()}\n"
         + (f"WHAT IT COVERS (from the creator):\n{notes.strip()}\n" if notes.strip() else
            "The creator gave no further detail — stay general about the contents; do not guess specifics.\n")
+        + ("\nTHE POST ITSELF:\n" + media_mod.brief_for_writer(seen_media, owner, platform) + "\n" if seen_media else "")
+        + (f"\nHOW TO PACKAGE THIS KIND OF CONTENT: {_PLAYBOOK[seen['content_type']]}\n"
+           if seen.get("content_type") in _PLAYBOOK else "")
         + "\nEVIDENCE:\n" + _evidence_block(out["evidence"], out["strategy"])
         + f"\n\nWrite the {spec['label']} package now."
     )
+    # What people are talking about right now. Connecting to it is the one thing
+    # that can turn an evergreen post timely, when the connection is honest.
+    rising = [e["label"] for e in ((board or {}).get("states") or {}).get("RISING", []) if e.get("niche")][:6]
+    if rising:
+        user += ("\n\nRISING IN THIS NICHE TODAY — use one only if it connects honestly to this content, to make it "
+                 "feel timely, and say so in `why`. Never attach it to something unrelated, never to tragedy, and "
+                 "never state a detail of it the video does not cover:\n- " + "\n- ".join(rising))
+
+    # Memory: what was already written on this subject, and what the watched
+    # creators' own results say about titles. Both go to the planner.
+    past = past_work(topic)
+    try:
+        from . import recall
+        learned = recall.lessons("creator")
+    except Exception:  # noqa: BLE001
+        learned = []
+    if past:
+        used = [f"- ({time.strftime('%d %b', time.localtime(p['created_at']))}, {p['platform']}) {line}"
+                for p in past for line in p["lines"]][:14]
+        user += ("\n\nALREADY WRITTEN FOR THIS SUBJECT — do not repeat or lightly reword any of these. "
+                 "Find a different angle, or a follow-up to them:\n" + "\n".join(used))
+    if learned:
+        user += ("\n\nLEARNED FROM THE WATCHED CREATORS' OWN RESULTS (association, not a rule — use it "
+                 "where it fits the video):\n- " + "\n- ".join(learned))
+
     # Step 1 — think before writing: who is searching for this, what do they
     # want, which angle is open. The writer then executes that plan instead
     # of improvising one while also counting characters.
@@ -609,7 +732,49 @@ def generate(platform: str, topic: str, notes: str = "", language: str = "englis
     package = llm.structured(system, user, schema, max_tokens=3000)
     # One rewrite if the draft has problems code can see. Capped at one: a
     # second failure is shown to the creator rather than looped on.
-    issues = lint(package, topic, notes, out["evidence"], language)
+    # Figures that were really seen in the creator's own post are safe; figures
+    # seen in someone else's are not this creator's to state.
+    known = notes
+    if seen_media and owner == "mine":
+        known += "\n" + "\n".join(seen.get("key_points", []) + seen.get("on_screen_text", []))
+    real_stamps = {r["t"] for r in media_mod.real_chapters(seen_media, owner, platform)}
+    any_stamp = {r["t"] for r in seen.get("timeline", [])}
+    source_title = _tokens((seen_media or {}).get("facts", {}).get("title", "")) if owner == "theirs" else set()
+    current_title = _norm((seen_media or {}).get("facts", {}).get("title", "")) if owner == "mine" else ""
+    their_names = _their_specifics(seen, f"{topic}\n{notes}") if seen_media and owner == "theirs" else set()
+
+    def check(pkg):
+        found = lint(pkg, topic, known, out["evidence"], language)
+        # A chapter time must come from the video: only the watched timeline counts.
+        desc = pkg.get("description") or ""
+        made_up = [t for t in re.findall(r"(?m)^\s*[-•]?\s*(\d{1,2}:\d{2}(?::\d{2})?)\b", desc)
+                   if t not in real_stamps]
+        # ...and written mid-sentence, a watched time is still a chapter time
+        made_up += [t for t in any_stamp - real_stamps if re.search(rf"(?<![\d:]){re.escape(t)}\b", desc)]
+        if made_up:
+            found.append(f"Chapter time {made_up[0]} is not from the video — use only the real chapter times, or none.")
+        found += _limit_problems(pkg, spec["fields"])
+        if current_title and any(_norm(line) == current_title for line in _lines(pkg)):
+            found.append("One title option just repeats the video's current title — every option must be a new attempt.")
+        if their_names:
+            copy = " ".join(_lines(pkg) + [pkg.get("description") or ""])
+            used = sorted(n for n in their_names if re.search(rf"\b{re.escape(n)}\b", copy))
+            if used:
+                found.append(f"{', '.join(used[:4])} come from the other creator's video, not this creator's notes — "
+                             "do not describe their specifics as being in this video.")
+        if source_title:
+            for line in _lines(pkg):
+                toks = _tokens(line)
+                if toks and len(toks & source_title) / len(toks | source_title) >= 0.6:
+                    found.append(f"“{line}” is too close to the other creator's own title — write something original.")
+                    break
+        old = {_norm(line) for p in past for line in p["lines"]}
+        repeat = next((line for line in _lines(pkg) if _norm(line) in old), None)
+        if repeat:
+            found.append(f"“{repeat}” was already used for this subject — write a different one.")
+        return found
+
+    issues = check(package)
     revised = False
     if issues:
         package = llm.structured(
@@ -618,30 +783,120 @@ def generate(platform: str, topic: str, notes: str = "", language: str = "englis
             + "\n\nIt has these problems. Fix exactly these and keep everything else that was good:\n- "
             + "\n- ".join(issues),
             schema, max_tokens=3000)
-        issues, revised = lint(package, topic, notes, out["evidence"], language), True
+        issues, revised = check(package), True
+    for tag in reversed(spec.get("always_hashtags") or []):
+        have = [h for h in package.get("hashtags", []) if str(h).lstrip("#").lower() != tag.lower()]
+        package["hashtags"] = [tag] + have
     package, limit_notes = enforce(package, spec["fields"])
     out.update({"package": package, "limit_notes": limit_notes, "quality_notes": issues, "plan": plan,
+                "past": [{k: p[k] for k in ("created_at", "platform", "topic", "lines")} for p in past],
+                "media_used": bool(seen_media), "owner": owner if seen_media else None,
+                "learned": learned,
                 "revised": revised, "language": language, "fields": spec["fields"]})
     try:
-        _save(platform, topic, out["strategy"].get("state"), package)
+        _save(platform, topic, out["strategy"].get("state"), package, plan, language)
     except Exception:  # noqa: BLE001 — history is a convenience; never fail the result over it
         pass
     return out
 
 
-def _save(platform: str, topic: str, trend_state: str | None, package: dict) -> None:
-    with closing(analytics.connect()) as conn:
-        conn.executescript(_SCHEMA_SQL)
-        conn.execute("INSERT INTO content_packages (created_at, platform, topic, trend_state, package)"
-                     " VALUES (?,?,?,?,?)",
-                     (time.time(), platform, topic[:300], trend_state,
-                      json.dumps(package, ensure_ascii=False)))
+def _db():
+    conn = analytics.connect()
+    conn.executescript(_SCHEMA_SQL)
+    have = {r["name"] for r in conn.execute("PRAGMA table_info(content_packages)")}
+    for col in ("plan", "language"):               # added after the first release
+        if col not in have:
+            conn.execute(f"ALTER TABLE content_packages ADD COLUMN {col} TEXT")  # noqa: S608 — fixed names
+    return conn
+
+
+def _save(platform: str, topic: str, trend_state: str | None, package: dict,
+          plan: dict | None = None, language: str = "") -> None:
+    with closing(_db()) as conn:
+        conn.execute("INSERT INTO content_packages (created_at, platform, topic, trend_state, package, plan, language)"
+                     " VALUES (?,?,?,?,?,?,?)",
+                     (time.time(), platform, topic[:300], trend_state, json.dumps(package, ensure_ascii=False),
+                      json.dumps(plan, ensure_ascii=False) if plan else None, language))
         conn.commit()
 
 
+def _limit_problems(package: dict, fields: dict) -> list[str]:
+    """Lines over the platform's limit go back for a rewrite, not just a warning:
+    a hook cut off mid-sentence is no hook."""
+    out = []
+    for key in ("titles", "hooks"):
+        limit = (fields.get(key) or {}).get("max")
+        for item in (package.get(key) or []) if limit else []:
+            if len(item.get("text", "")) > limit:
+                out.append(f"“{item['text'][:60]}…” is {len(item['text'])} characters; the limit is {limit}. Shorten it.")
+    for key in ("thumbnail_text", "cover_text"):
+        words = (fields.get(key) or {}).get("max_words")
+        for option in (package.get(key) or []) if words else []:
+            if len(str(option).split()) > words:
+                out.append(f"“{option}” is too long for an image; at most {words} words.")
+    limit = (fields.get("description") or {}).get("max")
+    if limit and len(package.get("description") or "") > limit:
+        out.append(f"The text is over the {limit}-character limit. Shorten it.")
+    return out
+
+
+def _their_specifics(seen: dict, ours: str) -> set[str]:
+    """Names in someone else's video that this creator never mentioned: runs of
+    capitalised words in its key points."""
+    low = ours.lower()
+    names: set[str] = set()
+    for point in seen.get("key_points", []):
+        for run in re.findall(r"\b[A-Z][\w&-]+(?:\s+[A-Z][\w&-]+)+|\b[A-Z]{3,}\b", point):
+            if run.split()[0].lower() not in low:
+                names.add(run)
+    return names
+
+
+def _lines(package: dict) -> list[str]:
+    """The lines a viewer would see first: title options and opening hooks."""
+    return [x.get("text", "") for x in (package.get("titles") or []) + (package.get("hooks") or [])
+            if x.get("text")]
+
+
+def _norm(line: str) -> str:
+    return re.sub(r"[^\w]+", " ", line.lower()).strip()
+
+
+def past_work(topic: str, limit: int = 6) -> list[dict]:
+    """Earlier packages on the same subject — matched on the subject's words,
+    so "Jio IPO" and "Jio IPO shareholder quota" find each other."""
+    q = _tokens(topic)
+    if not q:
+        return []
+    out = []
+    with closing(_db()) as conn:
+        for r in conn.execute("SELECT created_at, platform, topic, trend_state, package FROM content_packages"
+                              " ORDER BY created_at DESC LIMIT 400"):
+            t = _tokens(r["topic"])
+            if not t or len(q & t) / len(q | t) < 0.5:
+                continue
+            lines = _lines(json.loads(r["package"]))
+            if lines:
+                out.append({"created_at": r["created_at"], "platform": r["platform"], "topic": r["topic"],
+                            "trend_state": r["trend_state"], "lines": lines})
+            if len(out) >= limit:
+                break
+    return out
+
+
+def made_summary(limit: int = 40) -> list[dict]:
+    """What has been packaged, by subject: how often, where, and when last."""
+    with closing(_db()) as conn:
+        return [{"topic": r["topic"], "packages": r["n"], "platforms": sorted(set((r["plats"] or "").split(","))),
+                 "first": r["first"], "last": r["last"]}
+                for r in conn.execute(
+                    "SELECT topic, COUNT(*) AS n, GROUP_CONCAT(platform) AS plats, MIN(created_at) AS first,"
+                    " MAX(created_at) AS last FROM content_packages GROUP BY lower(topic)"
+                    " ORDER BY last DESC LIMIT ?", (limit,))]
+
+
 def recent(limit: int = 15) -> list[dict]:
-    with closing(analytics.connect()) as conn:
-        conn.executescript(_SCHEMA_SQL)
+    with closing(_db()) as conn:
         return [{"id": r["id"], "created_at": r["created_at"], "platform": r["platform"],
                  "topic": r["topic"], "trend_state": r["trend_state"],
                  "package": json.loads(r["package"])}

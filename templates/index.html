@@ -87,7 +87,12 @@
   .move.fresh { color:#58a6ff; border-color:#58a6ff; }
   .move.upm { color:var(--ok); border-color:var(--ok); } .move.downm { color:var(--bad); border-color:var(--bad); }
   .col.c-TRENDING{border-top-color:var(--ok);} .col.c-SAME{border-top-color:var(--warn);}
-  .st-TRENDING{color:var(--ok);} .st-SAME{color:var(--warn);} .st-STEADY{color:#58a6ff;} .st-DORMANT{color:var(--dim);}
+  .memgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(460px,1fr)); gap:16px; align-items:start; }
+  .memtab { width:100%; border-collapse:collapse; font-size:13.5px; margin-top:8px; }
+  .memtab th { text-align:left; color:var(--dim); font-weight:400; font-size:12px; padding:4px 8px 6px 0; border-bottom:1px solid var(--line); }
+  .memtab td { padding:6px 8px 6px 0; border-bottom:1px solid var(--line); vertical-align:top; }
+  .memtab tr:last-child td { border-bottom:none; }
+  .st-TRENDING{color:var(--ok);} .st-SAME{color:var(--warn);} .st-STEADY{color:#58a6ff;} .st-EVERGREEN{color:#58a6ff;} .st-DORMANT{color:var(--dim);}
   .pulsebox { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-top:8px; background:var(--bg); }
   .pulsebox .big { font-size:17px; font-weight:700; }
   .mini { display:flex; align-items:center; gap:10px; margin-top:8px; font-size:13px; }
@@ -261,6 +266,7 @@
     <span class="pill" id="nav-update-new" style="display:none;background:#58a6ff">new</span></button>
   <button class="navbtn" data-view="history"><span class="ico">🗓</span> Past days</button>
   <button class="navbtn" data-view="posts"><span class="ico">📊</span> My posts &amp; results</button>
+  <button class="navbtn" data-view="memory"><span class="ico">🧠</span> Memory</button>
   <div class="navnote" id="nav-note"></div>
 </nav>
 <div>
@@ -280,6 +286,25 @@
 <section class="view" id="view-content">
   <div class="pagehead"><h2>Content generator</h2></div>
   <div class="pagesub">For a video you have already made: pick where it is going, say what it is about, and get the title, description, tags and hashtags in that platform's format — built from what people are searching and which titles are winning right now.</div>
+  <div class="panelbox" style="margin-bottom:14px">
+    <div class="cg-form">
+      <div class="wide"><label>Already posted, or have the file? Paste the link, and it watches the video or reads the image before suggesting. (Optional)</label>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <input id="mw-url" class="cg-in" style="flex:1;min-width:280px" placeholder="YouTube, Short, image or post link" maxlength="2000">
+          <button class="tp-btn gold" id="mw-go">Watch it</button>
+          <label class="tp-btn" style="display:inline-flex;align-items:center;cursor:pointer;margin:0;color:var(--ink);font-size:13.5px">Upload video / images
+            <input type="file" id="mw-file" multiple accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm" style="display:none"></label>
+        </div>
+      </div>
+      <div class="wide" style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;font-size:13.5px">
+        <label class="chk" style="display:inline-flex;gap:6px;align-items:center;margin:0;color:var(--ink);cursor:pointer;font-size:13.5px"><input type="radio" name="mw-owner" value="mine" checked> It is my post — improve it</label>
+        <label class="chk" style="display:inline-flex;gap:6px;align-items:center;margin:0;color:var(--ink);cursor:pointer;font-size:13.5px"><input type="radio" name="mw-owner" value="theirs"> Someone else's — learn from it, write mine differently</label>
+        <span class="tp-sig" id="mw-status"></span>
+      </div>
+    </div>
+    <div class="tp-sig" style="margin-top:6px">Instagram and Facebook show nothing without a login, and X and LinkedIn little more: upload the file or a screenshot for those. Uploads and links go to Google Gemini for analysis; its free tier may use them to improve its products.</div>
+    <div id="mw-out"></div>
+  </div>
   <div class="panelbox">
     <div class="cg-form">
       <div><label>Platform</label><select id="cg-platform"></select></div>
@@ -292,6 +317,7 @@
     <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;align-items:center">
       <button class="tp-btn" id="cg-analyse">Analyse trends (free)</button>
       <button class="tp-btn gold" id="cg-go">Suggest title, tags &amp; description</button>
+      <button class="tp-btn gold" id="cg-all" style="display:none"></button>
       <span class="tp-sig" id="cg-status"></span>
     </div>
   </div>
@@ -325,6 +351,11 @@
   <div class="pagesub">Every post you publish is logged with the trend state its topic was in. Enter the numbers to see what works for you.</div>
   <div class="panelbox statline" id="tp-postsum"></div>
   <div class="rows" id="tp-postlist"></div>
+</section>
+<section class="view" id="view-memory">
+  <div class="pagehead"><h2>Memory</h2></div>
+  <div class="pagesub">What the engine has learned from its own history — and how much history there is behind each claim. Nothing here is a guess: every figure counts rows in its own records.</div>
+  <div id="mem-out"><div class="tp-empty">Loading…</div></div>
 </section>
 <main class="view" id="view-create">
   <div class="quick" id="quick" style="display:none"></div>
@@ -638,7 +669,7 @@ const STATE_HINT = {
   FADING:"Losing attention. Skip, or do a “what happens next” piece.",
   WATCH:"Seen, but not enough history yet to say which way it is going."};
 const SRC_NAME = {news:"News", gtrends:"Google", youtube:"YouTube", wiki:"Wikipedia"};
-const VIEWS = ["create","content","trending","update","history","posts"];
+const VIEWS = ["create","content","trending","update","history","posts","memory"];
 const SHOWN = 6;
 // The 1 day / 2 days switch, shared by the board and the update page; remembered per browser.
 let WIN = 24, WIN_OPTS = [24, 48];
@@ -663,6 +694,7 @@ function show(view){
   if (VIEW === "update") loadUpdate();
   if (VIEW === "history") loadHistory();
   if (VIEW === "posts") loadPosts();
+  if (VIEW === "memory") loadMemory();
   if (VIEW === "trending") renderTrends();
   window.scrollTo(0, 0);
 }
@@ -806,6 +838,87 @@ $("tp-collect").onclick = async ()=>{
   } catch(e) { $("tp-asof").textContent = e.message; }
 };
 
+// --- watch a link or file before suggesting ---
+let MW = null, MW_BUSY = false;
+const PLAT_NAME = {youtube:"YouTube", youtube_shorts:"Shorts", instagram_reel:"Instagram", facebook:"Facebook", twitter:"X", linkedin:"LinkedIn"};
+function mwOwner(){ const r = document.querySelector('input[name="mw-owner"]:checked'); return r ? r.value : "mine"; }
+function stars(n){ return n ? `${n}/5` : "–"; }
+function clock(sec){ const m = Math.floor(sec/60), h = Math.floor(m/60);
+  return h ? `${h}h ${m%60}m` : m ? `${m}m ${sec%60}s` : `${sec}s`; }
+function mwList(title, rows, cls){ return rows && rows.length ? `<div class="cg-sec"><h4>${title}</h4>${rows.map(x=>`<div class="tp-sig ${cls||""}">• ${esc(x)}</div>`).join("")}</div>` : ""; }
+function mwRender(){
+  const r = MW; if (!r) { $("mw-out").innerHTML = ""; return; }
+  const s = r.seen||{}, f = r.facts||{}, p = r.performance, theirs = mwOwner()==="theirs";
+  const level = {watched:["Watched the video","up"], image:["Read the image","up"], metadata:["Content NOT seen — title and preview only","down"]}[r.how] || [r.how,"flat"];
+  let h = `<div class="cg-box" style="margin-top:14px"><div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap">
+    <h3 style="margin:0">${esc(f.title || s.subject || "Your file")}</h3><b class="${level[1]}">${level[0]}</b>
+    ${r.from_memory?`<span class="tp-sig">from memory; numbers refreshed</span>`:""}
+    <span style="flex:1"></span><button class="copy" id="mw-clear">clear</button></div>`;
+  h += `<div class="tp-sig">${[f.channel && esc(f.channel), f.seconds!=null && clock(f.seconds), f.kind, r.model && esc(r.model), f.slides>1 && f.slides+" slides"].filter(Boolean).join(" · ")}</div>`;
+  for (const w of r.warnings||[]) h += `<div class="tp-warn" style="margin-top:8px">⚠ ${esc(w)}</div>`;
+  if ((s.text_errors||[]).length) h += `<div class="tp-warn" style="margin-top:8px"><b>Fix in the video before posting — on-screen text cannot be changed later:</b><br>${s.text_errors.map(esc).join("<br>")}</div>`;
+  const TYPE = {news_explainer:"News explainer", education:"Education", stock_analysis:"Stock analysis", story:"Story", mood:"Mood / emotional", humour:"Humour", promo:"Promotion", interview:"Interview", other:"Other"};
+  if (s.content_type) h += `<div class="tp-sig" style="margin-top:6px"><b>${esc(TYPE[s.content_type]||s.content_type)}</b>${s.orientation?` · ${esc(s.orientation)}`:""}${(s.best_platforms||[]).length?` · best on: ${s.best_platforms.map(x=>esc(PLAT_NAME[x]||x)).join(", ")}`:""}</div>`;
+  if (s.core_line) h += `<div class="cg-sec"><h4>The line it lives on</h4><div style="font-size:14.5px">${esc(s.core_line)}</div></div>`;
+  if ((s.search_terms||[]).length) h += `<div class="cg-sec"><h4>What people search about this</h4>${s.search_terms.map(x=>`<span class="cg-chip">${esc(x)}</span>`).join("")}</div>`;
+  if (s.compliance_flags && s.compliance_flags.length) h += `<div class="tp-warn" style="margin-top:8px"><b>Compliance:</b> ${s.compliance_flags.map(esc).join("; ")}</div>`;
+  if (p) h += `<div class="cg-sec"><h4>How it is doing</h4><div class="tp-sig">${(f.views||0).toLocaleString()} views in ${p.age_days} days · ${p.views_per_hour.toLocaleString()} views/hour
+    ${p.vs_usual!=null?` · <b class="${p.vs_usual>=1.5?"up":p.vs_usual<0.7?"down":"flat"}">${p.vs_usual}× this channel's usual</b> (${p.channel_usual.toLocaleString()}/h, ${p.compared_with} recent videos)`:""}
+    ${p.like_rate!=null?` · ${(p.like_rate*100).toFixed(1)}% liked`:""}${p.comment_rate!=null?` · ${(p.comment_rate*100).toFixed(2)}% commented`:""}</div></div>`;
+  if (s.summary) h += `<div class="cg-sec"><h4>What it actually contains</h4><div style="font-size:14px">${esc(s.summary)}</div></div>`;
+  if (s.hook_what) h += `<div class="cg-sec"><h4>Hook — first 3 seconds: ${stars(s.hook_rating)}</h4><div class="tp-sig">${esc(s.hook_what)}</div><div style="font-size:13.5px;margin-top:4px"><b>Fix:</b> ${esc(s.hook_fix||"")}</div></div>`;
+  if (s.visual_fix) h += `<div class="cg-sec"><h4>Thumbnail / main image: ${stars(s.visual_rating)}</h4><div style="font-size:13.5px"><b>Fix:</b> ${esc(s.visual_fix)}</div></div>`;
+  if (s.title_matches===false) h += `<div class="tp-warn" style="margin-top:8px">The title does not honestly match the content: ${esc(s.title_note||"")}</div>`;
+  h += mwList(theirs?"Why it works — learn, do not copy":"Keep these", s.works);
+  h += mwList(theirs?"What it leaves open for you":"Left unsaid — follow-up ideas", s.gaps);
+  h += mwList("Where viewers may leave", s.retention_risks);
+  h += mwList("Check before you repeat these claims", s.claims_to_verify);
+  if ((s.timeline||[]).length) h += `<div class="cg-sec"><h4>Timeline${r.partial?" (part watched)":""}</h4>${s.timeline.map(x=>`<div class="cg-line"><span class="num">${esc(x.t)}</span><span>${esc(x.what)}</span></div>`).join("")}</div>`;
+  h += `<div class="tp-sig" style="margin-top:10px">Topic and notes below are filled from this${theirs?" (notes left empty, because that content is not yours)":""}. AI can mishear names and numbers: check them, then edit before suggesting.</div></div>`;
+  $("mw-out").innerHTML = h;
+  $("mw-clear").onclick = ()=>{ MW = null; mwRender(); mwAllButton(); $("mw-status").textContent = ""; };
+}
+function mwAllButton(){
+  const list = MW && MW.seen ? (MW.seen.best_platforms||[]).filter(x=>[...$("cg-platform").options].some(o=>o.value===x)) : [];
+  $("cg-all").style.display = list.length > 1 ? "inline-block" : "none";
+  $("cg-all").textContent = `Suggest for all ${list.length}: ${list.map(x=>PLAT_NAME[x]||x).join(", ")}`;
+  return list;
+}
+function mwFill(r){
+  MW = r;
+  const theirs = mwOwner()==="theirs";
+  if (r.topic) $("cg-topic").value = r.topic;
+  $("cg-notes").value = theirs ? "" : (r.notes || "");
+  if (r.platform && [...$("cg-platform").options].some(o=>o.value===r.platform)) $("cg-platform").value = r.platform;
+  if ([...$("cg-lang").options].some(o=>o.value===r.language)) $("cg-lang").value = r.language;
+  mwRender();
+  mwAllButton();
+}
+async function mwRun(work, label){
+  if (MW_BUSY) return;
+  MW_BUSY = true; $("mw-go").disabled = true; $("mw-status").textContent = label; $("cg-err").style.display = "none";
+  try { mwFill(await work()); $("mw-status").textContent = ""; }
+  catch(e) { $("mw-status").textContent = ""; $("cg-err").textContent = e.message; $("cg-err").style.display = "block"; }
+  finally { MW_BUSY = false; $("mw-go").disabled = false; }
+}
+$("mw-go").onclick = ()=>{
+  const url = $("mw-url").value.trim();
+  if (!url) { $("cg-err").textContent = "Paste a link first."; $("cg-err").style.display = "block"; return; }
+  mwRun(()=>api("/api/media/watch", {url}), "Watching — usually 10–60 seconds, longer when the free tier is busy…");
+};
+$("mw-url").addEventListener("keydown", e=>{ if (e.key === "Enter") $("mw-go").click(); });
+$("mw-file").onchange = ()=>{
+  const files = [...$("mw-file").files]; if (!files.length) return;
+  const fd = new FormData(); for (const f of files) fd.append("files", f);
+  mwRun(async ()=>{
+    const r = await fetch("/api/media/watch", {method:"POST", body:fd});
+    let d; try { d = await r.json(); } catch(e) { throw new Error("HTTP "+r.status); }
+    if (!r.ok) throw new Error(d.error || "HTTP "+r.status);
+    return d;
+  }, "Uploading and watching — a large video can take a few minutes…").finally(()=>{ $("mw-file").value = ""; });
+};
+for (const o of document.querySelectorAll('input[name="mw-owner"]')) o.onchange = ()=>{ if (MW) mwFill(MW); };
+
 // --- content generator: packaging for a video already made ---
 let CG_COPY = [];
 function copyBtn(text){ CG_COPY.push(String(text)); return `<button class="copy" data-c="${CG_COPY.length-1}">copy</button>`; }
@@ -839,7 +952,7 @@ function evidenceHtml(d){
       (ev.past||[]).slice(0,8).map(x=>`<div class="cg-line"><span class="num">${esc(x.day.slice(5))}</span><span><span class="st-${esc(x.state)}">${esc(STATE_NAME[x.state]||x.state)}</span> · ${x.mentions} items</span></div>`).join(""))}
   </div>`;
 }
-const PULSE_NAME = {TRENDING:"Trending", STEADY:"Steady (evergreen)", FADING:"Fading", DORMANT:"Dormant"};
+const PULSE_NAME = {TRENDING:"Trending", STEADY:"Steady (evergreen)", FADING:"Fading", DORMANT:"Dormant", EVERGREEN:"Evergreen (spreads by shares)"};
 function line(vals, w, h){
   const pts = vals.map((v,i)=>[i,v]); if (pts.length < 2) return "";
   const max = Math.max(...vals) || 1, n = vals.length - 1;
@@ -890,7 +1003,13 @@ function packageHtml(d){
   if (warns.length) h += `<div class="tp-warn">⚠ ${warns.map(esc).join("<br>⚠ ")}</div>`;
   h += writerLine(d);
   if (d.revised) h += `<div class="tp-sig">The first draft had weak spots (filler, repeated thumbnail text or figures not in your notes) and was rewritten once automatically.</div>`;
+  if (d.media_used) h += `<div class="tp-sig">Written from ${d.owner==="theirs"?"what the other creator's post shows, as a reference, not as your content":"what your post actually contains"}.</div>`;
   h += planHtml(d.plan);
+  if ((d.past||[]).length) h += sec("From memory — already written on this subject", "",
+      `<div class="tp-sig">The writer was shown these and told to find a different angle.</div>`
+      + d.past.slice(0,3).map(x=>`<div class="cg-line"><span class="num">${esc(dateStr(x.created_at))}</span><span>${x.lines.slice(0,3).map(esc).join("<br>")}</span></div>`).join(""));
+  if ((d.learned||[]).length) h += sec("From memory — learned from your creators", "",
+      d.learned.map(x=>`<div class="tp-sig">• ${esc(x)}</div>`).join(""));
   if (p.hooks && p.hooks.length) h += sec("Opening line — 3 to choose from", "", p.hooks.map(t=>`<div class="cg-item">
       <div class="txt">${esc(t.text)}</div>
       <div class="tp-sig"><span class="${t.over_limit?"down":"up"}">${t.chars} / ${f.hooks.max} chars</span> · ${esc(t.why)} ${copyBtn(t.text)}</div></div>`).join(""));
@@ -918,7 +1037,8 @@ async function runContent(analyseOnly){
     : "Researching the topic, planning the strategy, then writing — about 20–30 seconds…";
   try {
     const d = await api("/api/content", {platform:$("cg-platform").value, language:$("cg-lang").value,
-      topic, notes:$("cg-notes").value, analyse_only:analyseOnly});
+      topic, notes:$("cg-notes").value, analyse_only:analyseOnly,
+      media_id: MW ? MW.media_id : null, owner: mwOwner()});
     CG_COPY = [];
     $("cg-out").className = "cg-out" + (d.package ? "" : " single");
     $("cg-out").innerHTML = evidenceHtml(d) + (d.package ? packageHtml(d) : "");
@@ -942,6 +1062,32 @@ async function loadContentFormats(recentOnly){
         <br><span class="tp-sig">${esc(r.package.titles ? r.package.titles[0].text : (r.package.description||"").slice(0,120))}</span></span></div>`).join("");
   } catch(e) {}
 }
+// One package per recommended platform, one after another (free-tier limits).
+$("cg-all").onclick = async ()=>{
+  const list = mwAllButton(), topic = $("cg-topic").value.trim();
+  if (!list.length || !topic) return;
+  $("cg-err").style.display = "none";
+  for (const id of ["cg-analyse","cg-go","cg-all"]) $(id).disabled = true;
+  CG_COPY = []; $("cg-out").className = "cg-out"; $("cg-out").innerHTML = "";
+  const parts = []; let evidence = "";
+  try {
+    for (let i = 0; i < list.length; i++) {
+      $("cg-status").textContent = `Writing for ${PLAT_NAME[list[i]]||list[i]} (${i+1} of ${list.length})…`;
+      try {
+        const d = await api("/api/content", {platform:list[i], language:$("cg-lang").value, topic, notes:$("cg-notes").value,
+          media_id: MW ? MW.media_id : null, owner: mwOwner()});
+        if (!evidence) evidence = evidenceHtml(d);
+        parts.push(packageHtml(d));
+      } catch(e) { parts.push(`<div class="cg-box"><h3>${esc(PLAT_NAME[list[i]]||list[i])}</h3><div class="tp-warn">${esc(e.message)}</div></div>`); }
+      $("cg-out").innerHTML = evidence + `<div style="display:flex;flex-direction:column;gap:16px">${parts.join("")}</div>`;
+      wireCopy($("cg-out"));
+    }
+    loadContentFormats(true);
+  } finally {
+    for (const id of ["cg-analyse","cg-go","cg-all"]) $(id).disabled = false;
+    $("cg-status").textContent = "";
+  }
+};
 $("cg-analyse").onclick = ()=>runContent(true);
 $("cg-go").onclick = ()=>runContent(false);
 $("cg-topic").addEventListener("keydown", e=>{ if (e.key === "Enter") runContent(true); });
@@ -1034,6 +1180,69 @@ $("up-all").onchange = renderUpdate;
 // Keep the nav badge current without the page open; reload the page's own view when a new one lands.
 setInterval(()=>{ if (VIEW !== "update" || !UPD || !UPD.update || $("up-pick").selectedIndex <= 0) loadUpdate(); }, 120000);
 loadUpdate();
+
+// --- memory: what the engine has learned ---
+function dateStr(epoch){ return new Date(epoch*1000).toLocaleDateString([], {day:"numeric", month:"short"}); }
+async function loadMemory(){
+  try {
+    const r = await fetch("/api/memory"); const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "HTTP "+r.status);
+    const sc = d.scorecard, pt = d.patterns;
+    const days = d.collecting_since ? Math.max(1, Math.round((Date.now()/1000 - d.collecting_since)/86400)) : 0;
+    const box = (title, sub, body)=>`<div class="cg-box"><h3>${title}</h3><div class="tp-sig">${sub}</div>${body}</div>`;
+
+    // 1. were the trend calls right?
+    const graded = sc.states.filter(x=>x.n);
+    let calls = graded.length ? `<table class="memtab"><tr><th>Call</th><th>Graded</th><th>Right</th><th>Any topic would score</th><th>Edge</th><th>What happened next</th></tr>
+      ${sc.states.map(x=> x.n ? `<tr><td class="st-${x.state}"><b>${STATE_NAME[x.state]}</b></td><td>${x.n}${x.reliable?"":" <span class='tp-sig'>(few)</span>"}</td>
+        <td><b>${x.right_pct}%</b></td><td>${x.base_pct}%</td>
+        <td class="${x.lift_pts>=5?"up":x.lift_pts<=-5?"down":"flat"}"><b>${x.lift_pts>0?"+":""}${x.lift_pts} pts</b></td>
+        <td class="tp-sig">grew ${x.outcomes.grew}% · held ${x.outcomes.held}% · dropped ${x.outcomes.dropped}% · gone ${x.outcomes.gone}%</td></tr>`
+        : `<tr><td class="st-${x.state}"><b>${STATE_NAME[x.state]}</b></td><td colspan="5" class="tp-sig">none graded yet</td></tr>`).join("")}</table>
+      <div class="tp-sig" style="margin-top:8px">“Right” = a Rising or Emerging topic still held or grew its share one window later; Peaking held; Fading dropped or left the board. “Edge” is the gap to what any called topic would score — a call only helps if that is clearly above zero. Under 30 graded calls, treat the row as an anecdote.</div>`
+      : `<div class="tp-empty">No calls graded yet. A call can only be checked one full window (a day) after it is made.</div>`;
+    calls += `<div class="tp-sig" style="margin-top:8px">${sc.graded} graded · ${sc.pending} waiting for their window to pass${sc.ungradable_old?` · ${sc.ungradable_old} older calls made before grading existed cannot be checked`:""}</div>`;
+
+    // 2. what works in creator titles
+    let pat = pt.patterns.length ? `<table class="memtab"><tr><th>Titles that…</th><th>With</th><th>Without</th><th>Difference</th><th>Videos</th></tr>
+      ${pt.patterns.map(x=>`<tr><td>${esc(x.trait)}${x.reliable?"":` <span class='tp-sig'>(${x.n_with<pt.needs.per_side||x.n_without<pt.needs.per_side?"too few videos":"could be chance, p="+x.p})</span>`}</td>
+        <td>${x.with}×</td><td>${x.without}×</td>
+        <td class="${!x.reliable?"flat":x.effect>=1.25?"up":x.effect<=0.8?"down":"flat"}"><b>${x.effect>=1?"+":""}${Math.round((x.effect-1)*100)}%</b></td>
+        <td class="tp-sig">${x.n_with} vs ${x.n_without}</td></tr>`).join("")}</table>
+      <div class="tp-sig" style="margin-top:8px">“×” = views per hour against that channel's own usual pace for the same kind of video (live, Short, long). A pattern is only used in writing once it has ${pt.needs.per_side}+ videos on each side and the difference is unlikely to be chance (rank test, p below ${pt.needs.p_below} — strict, because a dozen traits are tested at once). This shows what goes together, not what causes what.</div>`
+      : `<div class="tp-empty">Not enough creator videos at least a day old yet.</div>`;
+    if (d.lessons.length) pat = `<div class="tp-warn" style="background:#10261a;border-color:var(--ok);color:#b6e3c4"><b>Now used when writing:</b><br>${d.lessons.map(esc).join("<br>")}</div>` + pat;
+
+    // 3. topics looked up
+    const seen = d.topics_seen.length ? `<table class="memtab"><tr><th>Topic</th><th>Looked up</th><th>Verdict over time</th><th>Readers a day</th></tr>
+      ${d.topics_seen.map(t=>`<tr><td>${esc(t.topic)}</td><td class="tp-sig">${t.looks}× · last ${ago(t.last_ts)}</td>
+        <td>${t.path.map(x=>x?`<span class="st-${esc(x)}">${esc(PULSE_NAME[x]||x)}</span>`:"–").join(" → ")}</td>
+        <td class="tp-sig">${t.readers_first!=null?Math.round(t.readers_first).toLocaleString():"–"}${t.looks>1&&t.readers_last!=null?" → "+Math.round(t.readers_last).toLocaleString():""}</td></tr>`).join("")}</table>`
+      : `<div class="tp-empty">No topic researched yet. Use the Content generator on any subject.</div>`;
+
+    // 4. what you have made
+    const names = {youtube:"YouTube", youtube_shorts:"Shorts", instagram_reel:"Instagram", facebook:"Facebook", twitter:"X", linkedin:"LinkedIn"};
+    const made = d.made.length ? `<table class="memtab"><tr><th>Subject</th><th>Packages</th><th>For</th><th>Last</th></tr>
+      ${d.made.map(m=>`<tr><td>${esc(m.topic)}</td><td>${m.packages}</td><td class="tp-sig">${m.platforms.map(x=>names[x]||esc(x)).join(", ")}</td><td class="tp-sig">${ago(m.last)}</td></tr>`).join("")}</table>
+      <div class="tp-sig" style="margin-top:8px">When you package one of these again, the writer is shown the earlier lines and told to find a new angle; an exact repeat is rejected.</div>`
+      : `<div class="tp-empty">Nothing packaged yet.</div>`;
+
+    const p = d.posts;
+    $("mem-out").innerHTML = `<div class="panelbox statline" style="margin-bottom:16px">
+        Collecting for <b>${days}</b> day${days==1?"":"s"}${d.collecting_since?` (since ${dateStr(d.collecting_since)})`:""} ·
+        <b>${d.size.items.toLocaleString()}</b> items · <b>${d.size.topics.toLocaleString()}</b> topics ·
+        <b>${d.size.topic_states.toLocaleString()}</b> trend calls · <b>${d.size.video_facts.toLocaleString()}</b> videos with a kept pace ·
+        <b>${d.days}</b> day${d.days==1?"":"s"} of per-day history · <b>${d.size.updates}</b> stored update${d.size.updates==1?"":"s"}
+        <br>Your own results: <b>${p.live_posts}</b> live post${p.live_posts==1?"":"s"}, <b>${p.measured}</b> with numbers entered — ${p.measured?"feeding the results table on My posts":"nothing to learn from here until results are logged"}.
+      </div>
+      <div class="memgrid">
+        ${box("Were the trend calls right?", "Every rising / peaking / fading call, checked one window later against what the topic actually did.", calls)}
+        ${box("What works in your creators' titles", `From ${pt.videos} creator videos at least a day old.`, pat)}
+        ${box("Topics you have researched", "Each look is kept, so a subject's own story builds up over weeks.", seen)}
+        ${box("What you have already made", "By subject.", made)}
+      </div>`;
+  } catch(e) { $("mem-out").innerHTML = `<div class="tp-empty">${esc(e.message)}</div>`; }
+}
 
 // --- past days ---
 async function loadHistory(day){

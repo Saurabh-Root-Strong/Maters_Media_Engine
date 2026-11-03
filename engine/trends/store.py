@@ -115,6 +115,11 @@ def connect() -> sqlite3.Connection:
     # ("live" / "short" / "long"; NULL = unknown or not a video).
     if "kind" not in {r["name"] for r in conn.execute("PRAGMA table_info(items)")}:
         conn.execute("ALTER TABLE items ADD COLUMN kind TEXT")
+    # The window a lifecycle call was made on. Without it a call cannot be
+    # graded later (graded against which next window?). Older rows stay NULL
+    # and are left ungraded rather than guessed at.
+    if "window_hours" not in {r["name"] for r in conn.execute("PRAGMA table_info(topic_states)")}:
+        conn.execute("ALTER TABLE topic_states ADD COLUMN window_hours REAL")
     return conn
 
 

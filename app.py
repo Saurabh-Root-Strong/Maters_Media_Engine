@@ -29,6 +29,7 @@ from engine.scheduler import scheduler  # noqa: E402
 from engine.trends import service as trends  # noqa: E402
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 300 * 1024 * 1024    # uploaded videos; larger is refused with a JSON error
 _OUT_DIR = os.path.join(os.path.dirname(__file__), "output")
 
 # In-memory store of runs (local single-user). run_id -> {"frozen": ..., "review": ...}
@@ -302,6 +303,26 @@ def api_trends_history():
     return jsonify({"days": days, "day": day, "topics": trends.history(day)})
 
 
+@app.errorhandler(413)
+def too_large(_err):
+    return jsonify({"error": "That file is over the 300 MB limit. Trim the video or upload a smaller copy."}), 413
+
+
+@app.post("/api/media/watch")
+def api_media_watch():
+    """Look at a pasted link (JSON {url}) or uploaded files (multipart `files`)."""
+    from engine import media
+    try:
+        if request.files:
+            files = [(f.read(), f.mimetype or "") for f in request.files.getlist("files")]
+            return jsonify(media.see_files([x for x in files if x[0]]))
+        return jsonify(media.watch_link(_body().get("url")))
+    except media.MediaError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": f"Could not read that: {type(exc).__name__}. Try again, or upload the file."}), 500
+
+
 @app.get("/api/content/formats")
 def api_content_formats():
     from engine import content
@@ -334,14 +355,33 @@ def api_content():
         board = None
     try:
         if body.get("analyse_only"):
-            return jsonify(content.analyse(platform, topic, board))
+            from engine import media
+            seen_media = media.load(body.get("media_id"))
+            return jsonify(content.analyse(platform, topic, board, media=seen_media))
         if not llm.has_api_key():
             return jsonify({"error": f"{llm.key_var()} not set — add it to .env and restart. "
                                      "“Analyse trends” works without it."}), 400
-        out = content.generate(platform, topic, notes, language, board)
+        owner = "theirs" if body.get("owner") == "theirs" else "mine"
+        media_id = body.get("media_id") if isinstance(body.get("media_id"), str) else None
+        out = content.generate(platform, topic, notes, language, board, media_id=media_id, owner=owner)
         return jsonify({**out, "writer": llm.last_writer, "writer_skipped": llm.last_errors})
     except Exception as exc:  # noqa: BLE001
         return jsonify({"error": f"Content generator failed: {exc}"}), 500
+
+
+@app.get("/api/memory")
+def api_memory():
+    """What the engine has learned from its own history."""
+    from engine import content, recall
+    from engine.trends import lookup
+    try:
+        out = recall.overview()
+        out["topics_seen"] = lookup.topics_seen()
+        out["made"] = content.made_summary()
+        out["posts"] = analytics.summary()
+        return jsonify(out)
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": f"Memory read failed: {exc}"}), 500
 
 
 @app.get("/api/analytics")

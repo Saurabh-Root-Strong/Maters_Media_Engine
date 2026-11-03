@@ -160,6 +160,38 @@ your prompts to improve their products, and their limits and model lists change
 without notice — see `.env.example` for what was measured and when. Live web
 research still uses OpenAI: Gemini's search grounding refused a free-tier key.
 
+## Watch a post before suggesting (Content generator)
+
+Paste a link or upload a file above the generator form, and it looks at the
+content itself, then fills the topic, notes, platform and language for you to
+correct. Needs `GEMINI_API_KEY`; `YOUTUBE_API_KEY` adds views and the comparison
+with the channel's usual pace. Say whether the post is yours (improve it, real
+chapter times allowed) or someone else's (learn from it; its title, wording and
+specifics are rejected from your copy).
+
+| Input | What can be seen |
+|---|---|
+| Public YouTube video or Short | Watched, with thumbnail review; only the first 15 minutes of longer videos, and it says so |
+| Live or upcoming stream | Title, description and thumbnail only |
+| Private, deleted | Refused before any AI call; upload the file |
+| Instagram, Facebook | Nothing without a login; upload the file or a screenshot |
+| X, LinkedIn | Page preview at most, clearly marked "content not seen" |
+| Image link, uploaded images (up to 10) | Read, including carousels |
+| Uploaded video (up to 300 MB) | Watched; large files go through Gemini's Files API and are deleted after |
+
+The reading identifies the kind of content (mood, news explainer, education,
+stock analysis, story, humour, interview, promotion), and everything follows from
+that: it is judged by its own goal, researched under what people really type
+rather than a description of it, and packaged by a playbook for that kind. It also
+lists on-screen spelling mistakes to fix before posting and the platforms the file
+suits best, with one button to write for all of them. Chapter times appear only
+where YouTube would accept them (long-form, 3+, each 10+ seconds, watched whole).
+
+Links and uploads go to Google; its free tier may use them to improve its
+products, so avoid unreleased or confidential videos on a free key. Readings are
+kept in `analytics.db` for 14 days, so a repeat costs nothing. The AI can mishear
+names and numbers: check the notes before suggesting.
+
 ## Content generator (packaging a video you already made)
 
 Left menu → **Content generator**. Pick the platform (YouTube, Shorts, Instagram

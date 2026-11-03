@@ -46,10 +46,28 @@ CREATE TABLE IF NOT EXISTS lookups (
     payload TEXT NOT NULL,
     PRIMARY KEY (key, part)
 ) WITHOUT ROWID;
+
+-- The cache above holds only the latest look. This keeps every look, so a
+-- topic's own story over weeks and months is not lost when the cache turns over.
+CREATE TABLE IF NOT EXISTS lookup_history (
+    id INTEGER PRIMARY KEY,
+    key TEXT NOT NULL,
+    topic TEXT NOT NULL,
+    ts REAL NOT NULL,
+    state TEXT,
+    readers7 REAL,                 -- Wikipedia readers a day, last 7 days
+    news_per_day REAL,
+    yt_found INTEGER,
+    yt_top_views INTEGER
+);
+CREATE INDEX IF NOT EXISTS lookup_history_key ON lookup_history (key, ts);
 """
 
+_MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September",
+           "October", "November", "December")
 
-CACHE_VERSION = "v2"             # bump when what a cached part contains changes
+
+CACHE_VERSION = "v4"             # bump when what a cached part contains changes
 
 
 def _key(topic: str) -> str:
@@ -118,11 +136,54 @@ def _article_views(title: str, now: float, fetch, days: int = 60) -> list[int]:
     return [int(i.get("views", 0)) for i in data.get("items", [])]
 
 
+def _seasonality(title: str, now: float, fetch) -> dict | None:
+    """Does interest in this subject come back at the same time every year?
+
+    Three years of monthly readers. A month counts as the season when it runs
+    well above a normal month on average AND was among that year's three
+    busiest months in at least two years — one freak spike is not a season.
+    """
+    today = datetime.fromtimestamp(now, timezone.utc).date()
+    end = today.replace(day=1) - timedelta(days=1)                 # last complete month
+    start = end.replace(day=1, year=end.year - 3)
+    slug = urllib.parse.quote(title.replace(" ", "_"), safe="")
+    data = json.loads(fetch(f"{_VIEWS}{slug}/monthly/{start:%Y%m}0100/{end:%Y%m%d}00"))
+    months: dict[tuple, int] = {}
+    for i in data.get("items", []):
+        stamp = str(i.get("timestamp", ""))
+        if len(stamp) >= 6:
+            months[(int(stamp[:4]), int(stamp[4:6]))] = int(i.get("views", 0))
+    if len(months) < 24:
+        return None
+    normal = sorted(months.values())[len(months) // 2] or 1
+    by_month: dict[int, list] = {}
+    for (_, m), v in months.items():
+        by_month.setdefault(m, []).append(v)
+    top3 = {}
+    for year in {y for y, _ in months}:
+        ranked = sorted((v, m) for (y, m), v in months.items() if y == year)
+        if len(ranked) >= 9:                                      # a partial year cannot rank its months
+            typical = ranked[len(ranked) // 2][0] or 1
+            # top three AND clearly above that year's own typical month — in a
+            # flat year "top three" is just a tie-break, not a peak
+            top3[year] = {m for v, m in ranked[-3:] if v >= 1.3 * typical}
+    best_month, best_index = None, 0.0
+    for m, vals in by_month.items():
+        index = (sum(vals) / len(vals)) / normal
+        recurring = sum(1 for months_ in top3.values() if m in months_)
+        if index >= 1.5 and recurring >= 2 and index > best_index:
+            best_month, best_index = m, index
+    if not best_month:
+        return None
+    return {"peak_month": best_month, "peak_month_name": _MONTHS[best_month - 1],
+            "index": round(best_index, 1), "months_away": (best_month - today.month) % 12}
+
+
 def interest_pulse(topic: str, now: float, fetch) -> dict | None:
     """Daily readers of the Wikipedia article that best matches the topic."""
     hits = json.loads(fetch(_WIKI + urllib.parse.urlencode(
         {"action": "query", "list": "search", "srsearch": topic, "srlimit": 4, "format": "json"})))
-    q = tokens(topic)
+    q = tokens(topic) - GENERIC or tokens(topic)    # "Stock market" is not the subject of "stock market jua"
     best = None
     for h in hits.get("query", {}).get("search", []):
         title = h.get("title", "")
@@ -147,7 +208,12 @@ def interest_pulse(topic: str, now: float, fetch) -> dict | None:
     peak = max(views)
     peak_day = (datetime.fromtimestamp(now, timezone.utc).date()
                 - timedelta(days=len(views) - views.index(peak)))
+    try:
+        season = _seasonality(title, now, fetch)
+    except Exception:  # noqa: BLE001 — a nice-to-have on top of the 60-day line
+        season = None
     return {
+        "season": season,
         "article": title, "url": "https://en.wikipedia.org/wiki/" + urllib.parse.quote(title.replace(" ", "_")),
         "avg_per_day": round(avg), "last7": round(last7), "prev7": round(prev7),
         "ratio": _ratio(last7, prev7) if avg >= 30 else None,     # under ~30 readers/day the line is noise
@@ -173,7 +239,10 @@ def youtube_pulse(topic: str, now: float, key: str, fetch) -> dict:
     items = json.loads(fetch(f"{_YT}/videos?" + urllib.parse.urlencode(
         {"part": "snippet,statistics,contentDetails,liveStreamingDetails", "id": ",".join(ids),
          "key": key}))).get("items", [])
+    # A video must carry most of the subject's naming words. Matching any one of
+    # them let "stock market ambition emotional reel" find a Virat Kohli video.
     q = tokens(topic) - GENERIC or tokens(topic)
+    need = max(1, (len(q) * 3 + 4) // 5)        # 60%, rounded up
     vids = []
     for v in items:
         sn = v.get("snippet", {})
@@ -188,7 +257,7 @@ def youtube_pulse(topic: str, now: float, key: str, fetch) -> dict:
         # search also returns loosely related videos; keep the ones whose own
         # title or description actually names the subject
         text = tokens(title) | tokens((sn.get("description") or "")[:300])
-        if not (text & q):
+        if len(text & q) < need:
             continue
         age_h = max((now - published) / 3600, 1.0)
         vids.append({"title": title, "channel": sn.get("channelTitle", ""), "views": views,
@@ -232,6 +301,13 @@ def verdict(news: dict | None, interest: dict | None) -> dict:
         reasons.append(f"Wikipedia “{interest['article']}”: about {interest['last7']:,} readers a day{chg}")
         if interest["ratio"] is not None:
             ratios.append(interest["ratio"])
+        season = interest.get("season")
+        if season:
+            away = season["months_away"]
+            when = ("that is this month" if away == 0 else "that is next month" if away == 1
+                    else f"{away} months away")
+            reasons.append(f"Seasonal: interest usually peaks in {season['peak_month_name']} "
+                           f"(about {season['index']}× a normal month, over the last three years) — {when}")
         if interest["peak_vs_normal"] >= 3:
             reasons.append(f"Interest spiked to {interest['peak']:,} on {interest['peak_day']} "
                            f"({interest['peak_vs_normal']}× a normal day) — it flares up around events")
@@ -308,4 +384,51 @@ def research(topic: str, now: float | None = None, fetch=None, youtube: bool = T
                 except Exception as exc:  # noqa: BLE001
                     out["errors"].append(f"youtube: {type(exc).__name__}")
     out["verdict"] = verdict(out.get("news"), out.get("interest"))
+
+    # --- memory: what did this topic look like the last times it was looked up? ---
+    with closing(store.connect()) as conn:
+        conn.executescript(_TABLE)
+        past = [dict(r) for r in conn.execute(
+            "SELECT ts, state, readers7, news_per_day, yt_found, yt_top_views FROM lookup_history"
+            " WHERE key=? ORDER BY ts DESC LIMIT 12", (key,))]
+        interest, news, yt = out.get("interest") or {}, out.get("news") or {}, out.get("youtube") or {}
+        fresh = {"news", "interest"} - set(out["cached"])
+        # one row per real look — a cached repeat is the same look, not a new one
+        if fresh and (out.get("news") or out.get("interest")):
+            conn.execute(
+                "INSERT INTO lookup_history (key, topic, ts, state, readers7, news_per_day, yt_found, yt_top_views)"
+                " VALUES (?,?,?,?,?,?,?,?)",
+                (key, topic[:200], now, out["verdict"]["state"], interest.get("last7"),
+                 news.get("per_day_recent"), yt.get("found"),
+                 (yt.get("videos") or [{}])[0].get("views")))
+            conn.commit()
+    out["history"] = past
+    if past:
+        last = past[0]
+        days = (now - last["ts"]) / 86400
+        if days >= 1:
+            bits = [f"was {last['state'].lower()}" if last.get("state") else ""]
+            if last.get("readers7") and interest.get("last7"):
+                chg = (interest["last7"] / last["readers7"] - 1) * 100
+                bits.append(f"readers {last['readers7']:,.0f} → {interest['last7']:,} a day ({chg:+.0f}%)")
+            out["verdict"]["reasons"].append(
+                f"Since you last looked {days:.0f} day{'s' if days >= 1.5 else ''} ago: "
+                + ", ".join(b for b in bits if b))
     return out
+
+
+def topics_seen(limit: int = 30) -> list[dict]:
+    """Every subject ever looked up, newest first, with the path its verdict took."""
+    with closing(store.connect()) as conn:
+        conn.executescript(_TABLE)
+        rows = conn.execute(
+            "SELECT key, MAX(ts) AS last_ts, COUNT(*) AS looks FROM lookup_history GROUP BY key"
+            " ORDER BY last_ts DESC LIMIT ?", (limit,)).fetchall()
+        out = []
+        for r in rows:
+            path = conn.execute("SELECT topic, ts, state, readers7 FROM lookup_history WHERE key=? ORDER BY ts",
+                                (r["key"],)).fetchall()
+            out.append({"topic": path[-1]["topic"], "looks": r["looks"], "last_ts": r["last_ts"],
+                        "first_ts": path[0]["ts"], "path": [p["state"] for p in path],
+                        "readers_first": path[0]["readers7"], "readers_last": path[-1]["readers7"]})
+        return out

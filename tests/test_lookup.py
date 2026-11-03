@@ -298,3 +298,42 @@ def test_over_long_tags_are_dropped_not_cut_mid_word():
                               "pinned_comment": "", "tags": ["harshad mehta scam explained in hindi", "scam 1992"]},
                              fields)
     assert pkg["tags"] == ["scam 1992"]
+
+
+@pytest.mark.parametrize("article,topic,word,flagged", [
+    ("Harshad Mehta", "harshad mehta scam", "the harshad case", True),
+    ("Technical analysis", "technical analysis", "a technical view", False),      # sentence case is not a name
+    ("Price of oil", "crude oil price", "the price of crude", False),
+    ("ITC Limited", "itc", "buying itc today", True),
+])
+def test_only_real_names_must_be_capitalised(article, topic, word, flagged):
+    ev = {"lookup": {"interest": {"article": article}}}
+    issues = content.lint({"description": word, "hashtags": []}, topic, "", ev)
+    assert any("Write the name properly" in i for i in issues) is flagged
+
+
+def test_a_video_must_carry_most_of_the_subject_not_any_one_word():
+    yt = [("a", "The reality of reels actors", 900, 5, "PT30S", ""),                     # only "reel"
+          ("b", "Stock market jua hai ya business?", 800, 5, "PT30S", ""),
+          ("c", "Family says stock market is jua", 700, 5, "PT30S", "")]
+    y = lookup.youtube_pulse("stock market jua reel", NOW, "k", make_fetch(yt=yt))
+    assert [v["title"] for v in y["videos"]] == ["Stock market jua hai ya business?", "Family says stock market is jua"] or y["found"] <= 2
+    assert "The reality of reels actors" not in [v["title"] for v in y["videos"]]
+
+
+def test_a_generic_article_is_not_the_subjects_interest_line():
+    i = lookup.interest_pulse("stock market jua", NOW, make_fetch(wiki={"Stock market": [50000] * 60}))
+    assert i is None                                    # "Stock market" readers say nothing about "jua"
+
+
+def test_research_tries_a_second_term_only_when_the_first_is_thin(monkeypatch):
+    calls = []
+
+    def research(term, **kw):
+        calls.append(term)
+        return {"youtube": {"found": 1 if term == "first" else 9}, "news": {"articles": 0}, "verdict": {}}
+    monkeypatch.setattr(content.lookup, "research", research)
+    assert content._research("t", ["first", "second", "third"], {})["term"] == "second"
+    assert calls == ["first", "second"]
+    calls.clear()
+    assert content._research("t", ["second", "first"], {})["term"] == "second" and calls == ["second"]

@@ -504,7 +504,7 @@ def compute(now: float | None = None, cfg: dict | None = None, write: bool = Fal
             rows.sort(key=key, reverse=True)
 
         if write:
-            _record(conn, recorded, now)
+            _record(conn, recorded, now, hours)
             conn.commit()
 
     interval_s = cfg["interval_minutes"] * 60
@@ -558,15 +558,15 @@ def compute(now: float | None = None, cfg: dict | None = None, write: bool = Fal
             "sources": src_out, "counts": counts, "niche_counts": niche_counts}
 
 
-def _record(conn, entries: list[dict], now: float) -> None:
+def _record(conn, entries: list[dict], now: float, hours: float | None = None) -> None:
     day = datetime.fromtimestamp(now, _IST).strftime("%Y-%m-%d")
     for e in entries:
         last = conn.execute("SELECT state FROM topic_states WHERE topic_id=? ORDER BY ts DESC LIMIT 1",
                             (e["id"],)).fetchone()
         if not last or last["state"] != e["state"]:
             vel = None if e["velocity_pct"] is None else e["velocity_pct"] / 100
-            conn.execute("INSERT INTO topic_states (topic_id, ts, state, score, velocity)"
-                         " VALUES (?,?,?,?,?)", (e["id"], now, e["state"], e["score"], vel))
+            conn.execute("INSERT INTO topic_states (topic_id, ts, state, score, velocity, window_hours)"
+                         " VALUES (?,?,?,?,?,?)", (e["id"], now, e["state"], e["score"], vel, hours))
         conn.execute(
             "INSERT INTO topic_daily (topic_id, day, label, peak_score, last_state, mentions, sources, niche)"
             " VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(topic_id, day) DO UPDATE SET"
@@ -782,6 +782,14 @@ class TrendService:
                 self._board, self._board_at = compute(write=True), time.time()
                 self._other.clear()  # fresh data: other windows recompute on next view
                 maybe_update()      # the periodic digest, when one is due
+                # Memory: keep each video's pace for good, and grade every call
+                # that is now a window old against what the topic went on to do.
+                try:
+                    from .. import recall
+                    recall.snapshot_videos()
+                    recall.grade_calls()
+                except Exception:  # noqa: BLE001 — learning must never stop collecting
+                    pass
             finally:
                 self.running = False
                 self._last_finish = time.time()

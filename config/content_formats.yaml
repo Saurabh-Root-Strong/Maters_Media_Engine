@@ -8,6 +8,7 @@
 #   hashtags      min/max count
 #   thumbnail_text / cover_text   short words to put ON the image
 #   pinned_comment                first comment to pin
+# always_hashtags: your brand tag; added by code, first in the list
 #   hooks         n alternative opening lines to test (caption platforms); max = characters
 # rules:   told to the writer. Reviewed 2026-10-06 — platforms change; re-check.
 # suggest: which search-suggestion feed to read (yt = YouTube search, web = Google)
@@ -46,6 +47,7 @@ youtube_shorts:
 
 instagram_reel:
   label: Instagram Reel
+  always_hashtags: [TheMarketTales]     # added by code, so it is never misspelled
   suggest: web
   fields:
     hooks:       {n: 3, max: 125}
