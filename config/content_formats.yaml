@@ -37,6 +37,7 @@ youtube_shorts:
   fields:
     titles:      {n: 3, max: 100, show: 40}
     description: {max: 500, hook: 100}
+    tags:        {max_total: 500, max_each: 30, aim: 8}
     hashtags:    {min: 2, max: 3}
     pinned_comment: {max: 300}
   rules:
@@ -44,6 +45,7 @@ youtube_shorts:
     - Shorts are ranked on how long people keep watching, not on metadata - the title only has to make the first second make sense.
     - Description - one or two lines, main phrase once.
     - Hashtags - 2 or 3 specific ones. "#Shorts" is not needed.
+    - Tags - YouTube Studio's Tags box (under "Show more"; the phone app has none). Minor signal - the main phrase, close variants, Hinglish and Hindi spellings and common misspellings. No unrelated popular tags.
 
 instagram_reel:
   label: Instagram Reel

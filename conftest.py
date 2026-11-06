@@ -15,6 +15,7 @@ os.environ["MEDIA_ENGINE_TRENDS"] = "off"
 # never overrides a variable that already exists), so no test can reach a real
 # provider through a configured fallback chain.
 os.environ["MEDIA_ENGINE_WRITERS"] = ""
+os.environ["MEDIA_ENGINE_JUDGES"] = ""
 os.environ["MEDIA_ENGINE_SEARCH"] = ""
 os.environ["YOUTUBE_API_KEY"] = ""      # tests choose the YouTube path themselves
 

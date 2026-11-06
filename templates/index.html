@@ -69,6 +69,10 @@
   .cg-line .num { color:var(--accent); font-weight:700; white-space:nowrap; min-width:74px; }
   .cg-chip { display:inline-block; background:var(--panel2); border:1px solid var(--line); border-radius:16px;
     padding:3px 11px; margin:3px 5px 0 0; font-size:13px; }
+  .cg-ready { border:1px solid var(--gold, #d4a72c); border-radius:11px; padding:12px 14px; margin:10px 0 14px; }
+  .cg-ready h4 { display:flex; align-items:center; gap:8px; }
+  .cg-ready .copy.all { border-color:var(--gold, #d4a72c); color:var(--gold, #d4a72c); font-weight:600; }
+  .cg-more > summary { cursor:pointer; color:var(--dim); margin:6px 0; }
   .cg-item { border:1px solid var(--line); border-radius:9px; padding:10px 12px; margin-top:8px; background:var(--bg); }
   .cg-item .txt { font-size:15px; font-weight:600; line-height:1.4; }
   .cg-pre { white-space:pre-wrap; font-size:14px; line-height:1.55; border:1px solid var(--line); border-radius:9px;
@@ -921,12 +925,13 @@ for (const o of document.querySelectorAll('input[name="mw-owner"]')) o.onchange 
 
 // --- content generator: packaging for a video already made ---
 let CG_COPY = [];
-function copyBtn(text){ CG_COPY.push(String(text)); return `<button class="copy" data-c="${CG_COPY.length-1}">copy</button>`; }
+function copyBtn(text, label, cls){ CG_COPY.push(String(text)); const l = label || "copy";
+  return `<button class="copy${cls?" "+cls:""}" data-c="${CG_COPY.length-1}" data-l="${esc(l)}">${esc(l)}</button>`; }
 function wireCopy(root){
   for (const b of root.querySelectorAll(".copy")) b.onclick = async ()=>{
     try { await navigator.clipboard.writeText(CG_COPY[+b.dataset.c]); b.textContent = "copied"; }
     catch(e) { b.textContent = "copy failed"; }
-    setTimeout(()=>{ b.textContent = "copy"; }, 1400);
+    setTimeout(()=>{ b.textContent = b.dataset.l || "copy"; }, 1400);
   };
 }
 function evidenceHtml(d){
@@ -995,12 +1000,26 @@ function planHtml(pl){
     ${row("Who is searching", pl.audience_intent)}${row("The angle", pl.angle)}${row("The promise", pl.promise)}
     ${row("Lead keyword", pl.primary_keyword)}${row("Also work in", (pl.secondary_keywords||[]).join(" · "))}${row("Stay away from", pl.avoid)}</div>`;
 }
+// The pick, assembled per upload box, so it can be pasted straight in.
+function readyHtml(d){
+  const r = d.ready || [], rv = d.review;
+  if (!r.length) return "";
+  const all = r.filter(x=>!x.note).map(x=>`${x.label.toUpperCase()}\n${x.text}`).join("\n\n");
+  let h = `<div class="cg-ready"><h4>Ready to post ${copyBtn(all, "copy everything", "all")}</h4>`;
+  if (rv && rv.by) h += `<div class="tp-sig">Picked by a second model that did not write it (<b>${esc(rv.by.split(":").pop())}</b>) · <b>${rv.score}/10</b> · ${esc(rv.reason||"")}${(rv.changed||[]).length?` · it rewrote the ${rv.changed.map(esc).join(", ")}`:""}</div>`;
+  else h += `<div class="tp-sig">No second model was available${rv&&(rv.errors||[]).length?` (${rv.errors.map(esc).join(", ")})`:""}, so the first option of each kind is shown.</div>`;
+  for (const x of r) h += `<div class="cg-sec"><h4>${esc(x.label)} <span style="text-transform:none;letter-spacing:0" class="tp-sig">${x.text.length} chars${x.note?` · ${esc(x.note)}`:""}${x.label==="Tags"?" · YouTube Studio → Show more → Tags":""}</span> ${copyBtn(x.text)}</h4><div class="cg-pre">${esc(x.text)}</div></div>`;
+  if (rv && (rv.problems||[]).length) h += `<div class="tp-warn" style="margin-top:8px"><b>Reviewer still sees:</b><br>${rv.problems.map(esc).join("<br>")}</div>`;
+  return h + `</div>`;
+}
 function packageHtml(d){
   const p = d.package, f = d.fields, descName = (f.description && f.description.name) || "Description";
   const sec = (title, extra, body)=> `<div class="cg-sec"><h4>${title} ${extra||""}</h4>${body}</div>`;
   let h = `<div class="cg-box"><h3>Your ${esc(d.label)} package</h3>`;
   const warns = d.limit_notes.concat((d.quality_notes||[]).map(x=>"Still to fix by hand: " + x));
   if (warns.length) h += `<div class="tp-warn">⚠ ${warns.map(esc).join("<br>⚠ ")}</div>`;
+  h += readyHtml(d);
+  if ((d.ready||[]).length) h += `<details class="cg-more"><summary>All options, strategy and memory</summary>`;
   h += writerLine(d);
   if (d.revised) h += `<div class="tp-sig">The first draft had weak spots (filler, repeated thumbnail text or figures not in your notes) and was rewritten once automatically.</div>`;
   if (d.media_used) h += `<div class="tp-sig">Written from ${d.owner==="theirs"?"what the other creator's post shows, as a reference, not as your content":"what your post actually contains"}.</div>`;
@@ -1026,6 +1045,7 @@ function packageHtml(d){
   if (p.hashtags) { const tags = p.hashtags.map(x=>"#"+x).join(" ");
     h += sec("Hashtags", copyBtn(tags), p.hashtags.map(x=>`<span class="cg-chip">#${esc(x)}</span>`).join("") || `<span class="tp-sig">none</span>`); }
   if (p.pinned_comment) h += sec("Pinned comment", copyBtn(p.pinned_comment), `<div class="cg-pre">${esc(p.pinned_comment)}</div>`);
+  if ((d.ready||[]).length) h += `</details>`;
   return h + `</div>`;
 }
 async function runContent(analyseOnly){

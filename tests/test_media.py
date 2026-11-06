@@ -525,7 +525,8 @@ def test_brand_hashtag_is_added_by_code_and_counted(monkeypatch):
 
 @pytest.mark.parametrize("line,bad", [
     ("Apne us dost ko tag karo jo charts dekhta hai?", True), ("Tag a friend who trades?", True),
-    ("Like if you agree?", True), ("Follow for more updates?", True), ("Share karo agar sach hai?", True),
+    ("Like if you agree?", True), ("Share this with a trader jo thak gaya hai", True),
+    ("Send this to a friend who panics", True), ("Ye video apne dost ko forward karo", True), ("Follow for more updates?", True), ("Share karo agar sach hai?", True),
     ("Sabse pehle kisne bola tha ki yeh mat karo?", False), ("Which stock did you like most?", False),
 ])
 def test_engagement_bait_is_caught_in_english_and_hinglish(line, bad):
@@ -564,6 +565,148 @@ def test_inline_chapter_times_on_a_reel_are_caught(gem, monkeypatch):
         package("Family says jua. 00:00 Night drive 00:09 Logo", title="Family calls it jua?"),
         package("Family says jua.", title="Family calls it jua?")])
     assert out["revised"] is True and "is not from the video" in prompts[1]
+
+
+# --- the pick: what gets pasted --------------------------------------------------
+
+FOUNTAIN = {"subject": "stock market peace", "summary": "Water fountains; market volatility is like water flow.",
+            "core_line": "Kabhi market upar uchhalta hai, kabhi neeche aata hai", "content_type": "mood",
+            "search_terms": ["stock market peace", "market volatility mindset"], "key_points": []}
+
+
+def test_off_subject_suggestions_are_dropped_and_their_words_remembered():
+    keep, noise = content._on_subject(["stock market peace", "stock market iran peace deal", "market volatility meaning in hindi",
+                                       "stock market peace deal"], FOUNTAIN)
+    assert keep == ["stock market peace", "market volatility meaning in hindi"]
+    assert {"iran", "deal"} <= noise
+    assert content._off_subject("IRAN AMERICA PEACE DEAL update", noise) and not content._off_subject("Market peace", noise)
+
+
+V = {"channel": "c", "views": 1000, "age_days": 2, "kind": "short", "views_per_hour": 20, "title_chars": 20, "url": "u"}
+
+
+def test_a_feeling_is_not_researched_through_the_news(monkeypatch):
+    monkeypatch.setattr(content.lookup, "research", lambda term, **kw: {
+        "youtube": {"found": 3, "videos": [dict(V, title="Iran peace deal crash"), dict(V, title="Market peace mindset"),
+                                           dict(V, title="THIS is the Day Iran Breaks the Market"),
+                                           dict(V, title="Peace Talks In Progress #psx #trading")],
+                    "phrases": [{"phrase": "peace deal", "count": 7}, {"phrase": "market peace", "count": 2}]},
+        "news": {"articles": 54, "headlines": [{"title": "Peace talks"}]}, "verdict": {"state": "TRENDING"}, "errors": []})
+    monkeypatch.setattr(content.insight, "suggest", lambda term, feed, *a, **kw: ["stock market iran peace deal", "stock market peace"])
+    out = content.analyse("instagram_reel", "stock market peace", media={"seen": FOUNTAIN})
+    look = out["evidence"]["lookup"]
+    assert look["news"] is None and look["verdict"]["state"] == "EVERGREEN"
+    assert [v["title"] for v in look["youtube"]["videos"]] == ["Market peace mindset"]
+    assert [x["phrase"] for x in look["youtube"]["phrases"]] == ["market peace"]
+    assert "stock market iran peace deal" not in out["evidence"]["searches"]
+
+
+@pytest.mark.parametrize("text", ["Ek aesthetic mood reel jo market ko compare karti hai",
+                                  "Yeh aesthetic visual metaphor un sabhi ke liye hai", "A short visual reminder on calm",
+                                  "A calming aesthetic reminder for traders"])
+def test_mood_reel_wording_is_production_talk(text):
+    assert "how the post was made" in " ".join(content.lint({"description": text, "hashtags": []}, "x", ""))
+
+
+PKG = {"titles": [{"text": "Weak one"}, {"text": "Market volatility ke beech sukoon?"}],
+       "hooks": [{"text": "First hook line"}, {"text": "Kabhi market upar, kabhi neeche."}],
+       "description": "Jab portfolio upar neeche ho, sukoon flow samajhne mein hai.",
+       "hashtags": ["TheMarketTales", "Sensex", "MarketVolatility"], "cover_text": ["Market ka flow", "Sukoon"],
+       "pinned_comment": "Aap kab calm rehte ho?"}
+
+
+def test_ready_to_post_assembles_each_upload_box():
+    spec = content.formats()["instagram_reel"]
+    r = {x["label"]: x["text"] for x in content.ready_to_post(PKG, spec, {"by": "g", "best_hook": 1, "best_cover": 1,
+                                                                        "hashtags": ["TheMarketTales", "MarketVolatility"]})}
+    assert r["Caption"] == ("Kabhi market upar, kabhi neeche.\n\nJab portfolio upar neeche ho, sukoon flow samajhne mein hai."
+                            "\n\n#TheMarketTales #MarketVolatility")
+    assert r["Cover text"] == "Sukoon" and "Title" not in r
+
+
+def test_ready_to_post_youtube_puts_hashtags_under_the_description():
+    spec = content.formats()["youtube_shorts"]
+    r = {x["label"]: x["text"] for x in content.ready_to_post(PKG, spec, None)}
+    assert r["Title"] == "Weak one" and r["Description"].endswith("#TheMarketTales #Sensex #MarketVolatility")
+    assert r["Pinned comment"] == "Aap kab calm rehte ho?"
+
+
+def test_the_hook_is_not_repeated_when_the_caption_already_opens_with_it():
+    spec = content.formats()["instagram_reel"]
+    pkg = {**PKG, "hooks": [{"text": "Jab portfolio upar neeche ho, sukoon flow samajhne mein hai."}]}
+    cap = content.ready_to_post(pkg, spec, None)[0]["text"]
+    assert cap.count("Jab portfolio") == 1
+
+
+def test_reviewer_picks_and_its_rewrite_is_checked(monkeypatch):
+    monkeypatch.setenv("MEDIA_ENGINE_JUDGES", "gemini:judge-model")
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(content.llm, "last_writer", "gemini:writer-model")
+    answer = {"best_title": 1, "best_hook": 1, "best_cover": 0, "improved_title": "Tag a friend who panics?",
+              "improved_hook": "", "improved_description": "", "hashtags": ["#MarketVolatility", "Invented", "Sensex"],
+              "problems": ["#Sensex is generic"], "score": 14, "reason": "Speaks to the feeling."}
+    monkeypatch.setattr(content.llm, "structured_on", lambda *a, **k: dict(answer))
+    spec = content.formats()["youtube_shorts"]
+    rv = content.review(PKG, spec, "youtube_shorts", "brief", "")
+    assert rv["by"] == "gemini:judge-model" and rv["score"] == 10
+    assert rv["improved_title"] == "" and rv["changed"] == []             # bait rewrite refused
+    assert rv["hashtags"] == ["MarketVolatility", "Sensex"]               # nothing invented
+    assert content.ready_to_post(PKG, spec, rv)[0]["text"] == "Market volatility ke beech sukoon?"
+
+
+def test_shorts_get_tags_and_every_platform_a_hashtag_box():
+    spec = content.formats()["youtube_shorts"]
+    assert "tags" in spec["fields"]
+    r = {x["label"]: x for x in content.ready_to_post({**PKG, "tags": ["market volatility", "share market sukoon"]}, spec, None)}
+    assert r["Tags"]["text"] == "market volatility, share market sukoon"
+    assert r["Hashtags"]["text"] == "#TheMarketTales #Sensex #MarketVolatility"
+    assert r["Hashtags"]["note"] == "already at the end of the description"
+
+
+def test_no_advice_is_not_a_problem_for_a_mood_reel(monkeypatch):
+    monkeypatch.setenv("MEDIA_ENGINE_JUDGES", "gemini:judge")
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(content.llm, "last_writer", "gemini:writer")
+    answer = {"best_title": 0, "best_hook": 0, "best_cover": 0, "improved_title": "", "improved_hook": "",
+              "improved_description": "", "hashtags": [], "score": 7, "reason": "r",
+              "problems": ["The reel offers motivation rather than actionable trading advice", "Title is over 40 characters"]}
+    monkeypatch.setattr(content.llm, "structured_on", lambda *a, **k: dict(answer))
+    spec = content.formats()["youtube_shorts"]
+    assert content.review(PKG, spec, "youtube_shorts", "b", "", share=True)["problems"] == ["Title is over 40 characters"]
+    assert len(content.review(PKG, spec, "youtube_shorts", "b", "", share=False)["problems"]) == 2
+
+
+def test_a_reviewer_server_error_is_retried_once(monkeypatch):
+    monkeypatch.setenv("MEDIA_ENGINE_JUDGES", "gemini:judge")
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(content.llm, "last_writer", "gemini:writer")
+    monkeypatch.setattr(content.time, "sleep", lambda s: None)
+    calls = []
+
+    class InternalServerError(Exception):
+        status_code = 500
+
+    def flaky(*a, **k):
+        calls.append(1)
+        if len(calls) == 1:
+            raise InternalServerError("busy")
+        return {"best_title": 0, "best_hook": 0, "best_cover": 0, "improved_title": "", "improved_hook": "",
+                "improved_description": "", "hashtags": [], "problems": [], "score": 8, "reason": "r"}
+    monkeypatch.setattr(content.llm, "structured_on", flaky)
+    assert content.review(PKG, content.formats()["youtube_shorts"], "youtube_shorts", "b", "")["score"] == 8
+    assert len(calls) == 2
+
+
+def test_a_writer_never_reviews_itself(monkeypatch):
+    monkeypatch.setenv("MEDIA_ENGINE_JUDGES", "gemini:same")
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(content.llm, "last_writer", "gemini:same")
+    assert content.review(PKG, content.formats()["youtube_shorts"], "youtube_shorts", "b", "") is None
+
+
+def test_reviewer_rewrite_with_a_new_figure_is_refused():
+    assert not content._clean_line("Nifty up 12% today", 100, "")
+    assert content._clean_line("Nifty up 12% today", 100, "it rose 12%")
 
 
 # --- routes ----------------------------------------------------------------------
