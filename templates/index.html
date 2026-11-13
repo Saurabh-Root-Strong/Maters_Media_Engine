@@ -69,6 +69,14 @@
   .cg-line .num { color:var(--accent); font-weight:700; white-space:nowrap; min-width:74px; }
   .cg-chip { display:inline-block; background:var(--panel2); border:1px solid var(--line); border-radius:16px;
     padding:3px 11px; margin:3px 5px 0 0; font-size:13px; }
+  .cg-plats { display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+  .cg-plat { display:inline-flex; align-items:center; gap:7px; padding:8px 12px; border:1px solid var(--line);
+    border-radius:9px; background:var(--bg); cursor:pointer; user-select:none; font-size:14px; }
+  .cg-plat input { accent-color:var(--gold, #d4a72c); width:16px; height:16px; margin:0; cursor:pointer; }
+  .cg-plat.on { border-color:var(--gold, #d4a72c); }
+  .cg-plat .best { font-size:11px; color:var(--gold, #d4a72c); font-weight:600; }
+  .cg-plat-links { font-size:12.5px; color:var(--dim); margin-top:6px; }
+  .cg-plat-links a { color:var(--dim); cursor:pointer; text-decoration:underline; margin-right:12px; }
   .cg-ready { border:1px solid var(--gold, #d4a72c); border-radius:11px; padding:12px 14px; margin:10px 0 14px; }
   .cg-ready h4 { display:flex; align-items:center; gap:8px; }
   .cg-ready .copy.all { border-color:var(--gold, #d4a72c); color:var(--gold, #d4a72c); font-weight:600; }
@@ -311,7 +319,9 @@
   </div>
   <div class="panelbox">
     <div class="cg-form">
-      <div><label>Platform</label><select id="cg-platform"></select></div>
+      <div class="wide"><label>Generate for — tick one or more platforms</label>
+        <div class="cg-plats" id="cg-plats"></div>
+        <div class="cg-plat-links"><a id="cg-plat-best" style="display:none">Best for this video</a><a id="cg-plat-all">All</a><a id="cg-plat-none">Clear</a></div></div>
       <div><label>Language</label><select id="cg-lang"></select></div>
       <div class="wide"><label>What is the video about? (one line — the subject, as a viewer would search it)</label>
         <input id="cg-topic" class="cg-in" placeholder='e.g. "Jio IPO shareholder quota explained"' maxlength="200"></div>
@@ -321,7 +331,6 @@
     <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;align-items:center">
       <button class="tp-btn" id="cg-analyse">Analyse trends (free)</button>
       <button class="tp-btn gold" id="cg-go">Suggest title, tags &amp; description</button>
-      <button class="tp-btn gold" id="cg-all" style="display:none"></button>
       <span class="tp-sig" id="cg-status"></span>
     </div>
   </div>
@@ -880,23 +889,44 @@ function mwRender(){
   if ((s.timeline||[]).length) h += `<div class="cg-sec"><h4>Timeline${r.partial?" (part watched)":""}</h4>${s.timeline.map(x=>`<div class="cg-line"><span class="num">${esc(x.t)}</span><span>${esc(x.what)}</span></div>`).join("")}</div>`;
   h += `<div class="tp-sig" style="margin-top:10px">Topic and notes below are filled from this${theirs?" (notes left empty, because that content is not yours)":""}. AI can mishear names and numbers: check them, then edit before suggesting.</div></div>`;
   $("mw-out").innerHTML = h;
-  $("mw-clear").onclick = ()=>{ MW = null; mwRender(); mwAllButton(); $("mw-status").textContent = ""; };
+  $("mw-clear").onclick = ()=>{ MW = null; mwRender(); renderPlats(); $("mw-status").textContent = ""; };
 }
-function mwAllButton(){
-  const list = MW && MW.seen ? (MW.seen.best_platforms||[]).filter(x=>[...$("cg-platform").options].some(o=>o.value===x)) : [];
-  $("cg-all").style.display = list.length > 1 ? "inline-block" : "none";
-  $("cg-all").textContent = `Suggest for all ${list.length}: ${list.map(x=>PLAT_NAME[x]||x).join(", ")}`;
-  return list;
+// --- which platforms to write for: tick-boxes, the video's best ones pre-ticked ---
+let CG_PLATS = [];                              // [{id, label}] from /api/content/formats
+function bestPlats(){ return MW && MW.seen ? (MW.seen.best_platforms||[]).filter(x=>CG_PLATS.some(p=>p.id===x)) : []; }
+function selectedPlats(){ return [...document.querySelectorAll('#cg-plats input:checked')].map(i=>i.value); }
+function setPlats(list){
+  for (const i of document.querySelectorAll('#cg-plats input')) i.checked = list.includes(i.value);
+  platsChanged();
+}
+function renderPlats(){
+  const best = bestPlats(), keep = selectedPlats();
+  $("cg-plats").innerHTML = CG_PLATS.map(p=>`<label class="cg-plat"><input type="checkbox" value="${esc(p.id)}"${keep.includes(p.id)?" checked":""}>
+    ${esc(p.label)}${best.includes(p.id)?` <span class="best">★ best</span>`:""}</label>`).join("");
+  for (const i of document.querySelectorAll('#cg-plats input')) i.onchange = platsChanged;
+  $("cg-plat-best").style.display = best.length ? "inline" : "none";
+  platsChanged();
+}
+function platsChanged(){
+  const sel = selectedPlats();
+  for (const i of document.querySelectorAll('#cg-plats input')) i.parentElement.classList.toggle("on", i.checked);
+  const names = sel.map(x=>PLAT_NAME[x]||x);
+  $("cg-go").textContent = !sel.length ? "Tick a platform first"
+    : sel.length === 1 ? `Suggest for ${names[0]}` : `Suggest for ${sel.length}: ${names.join(", ")}`;
+  $("cg-go").disabled = !sel.length;
+  $("cg-analyse").disabled = !sel.length;
+  try { localStorage.setItem("cg-plats", JSON.stringify(sel)); } catch(e) {}
 }
 function mwFill(r){
   MW = r;
   const theirs = mwOwner()==="theirs";
   if (r.topic) $("cg-topic").value = r.topic;
   $("cg-notes").value = theirs ? "" : (r.notes || "");
-  if (r.platform && [...$("cg-platform").options].some(o=>o.value===r.platform)) $("cg-platform").value = r.platform;
   if ([...$("cg-lang").options].some(o=>o.value===r.language)) $("cg-lang").value = r.language;
   mwRender();
-  mwAllButton();
+  renderPlats();
+  const best = bestPlats();
+  setPlats(best.length ? best : (r.platform && CG_PLATS.some(p=>p.id===r.platform) ? [r.platform] : selectedPlats()));
 }
 async function mwRun(work, label){
   if (MW_BUSY) return;
@@ -1056,7 +1086,7 @@ async function runContent(analyseOnly){
   $("cg-status").textContent = analyseOnly ? "Looking the topic up — news, reader interest, YouTube…"
     : "Researching the topic, planning the strategy, then writing — about 20–30 seconds…";
   try {
-    const d = await api("/api/content", {platform:$("cg-platform").value, language:$("cg-lang").value,
+    const d = await api("/api/content", {platform:selectedPlats()[0], language:$("cg-lang").value,
       topic, notes:$("cg-notes").value, analyse_only:analyseOnly,
       media_id: MW ? MW.media_id : null, owner: mwOwner()});
     CG_COPY = [];
@@ -1065,13 +1095,17 @@ async function runContent(analyseOnly){
     wireCopy($("cg-out"));
     if (d.package) loadContentFormats(true);
   } catch(e) { $("cg-err").textContent = e.message; $("cg-err").style.display = "block"; }
-  finally { $("cg-analyse").disabled = $("cg-go").disabled = false; $("cg-status").textContent = ""; }
+  finally { $("cg-status").textContent = ""; platsChanged(); }
 }
 async function loadContentFormats(recentOnly){
   try {
     const d = await (await fetch("/api/content/formats")).json();
     if (!recentOnly) {
-      $("cg-platform").innerHTML = d.platforms.map(p=>`<option value="${esc(p.id)}">${esc(p.label)}</option>`).join("");
+      CG_PLATS = d.platforms;
+      let saved = [];
+      try { saved = JSON.parse(localStorage.getItem("cg-plats") || "[]"); } catch(e) {}
+      renderPlats();
+      setPlats(saved.filter(x=>CG_PLATS.some(p=>p.id===x)).length ? saved : [CG_PLATS[0].id]);
       $("cg-lang").innerHTML = d.languages.map(l=>`<option value="${esc(l)}">${esc(l[0].toUpperCase()+l.slice(1))}</option>`).join("");
     }
     $("cg-recent-box").style.display = d.recent.length ? "block" : "none";
@@ -1082,12 +1116,12 @@ async function loadContentFormats(recentOnly){
         <br><span class="tp-sig">${esc(r.package.titles ? r.package.titles[0].text : (r.package.description||"").slice(0,120))}</span></span></div>`).join("");
   } catch(e) {}
 }
-// One package per recommended platform, one after another (free-tier limits).
-$("cg-all").onclick = async ()=>{
-  const list = mwAllButton(), topic = $("cg-topic").value.trim();
-  if (!list.length || !topic) return;
+// One package per ticked platform, one after another (free-tier limits).
+async function runMany(list){
+  const topic = $("cg-topic").value.trim();
   $("cg-err").style.display = "none";
-  for (const id of ["cg-analyse","cg-go","cg-all"]) $(id).disabled = true;
+  if (!topic) { $("cg-err").textContent = "Say what the video is about."; $("cg-err").style.display = "block"; return; }
+  for (const id of ["cg-analyse","cg-go"]) $(id).disabled = true;
   CG_COPY = []; $("cg-out").className = "cg-out"; $("cg-out").innerHTML = "";
   const parts = []; let evidence = "";
   try {
@@ -1104,12 +1138,15 @@ $("cg-all").onclick = async ()=>{
     }
     loadContentFormats(true);
   } finally {
-    for (const id of ["cg-analyse","cg-go","cg-all"]) $(id).disabled = false;
     $("cg-status").textContent = "";
+    platsChanged();
   }
-};
+}
 $("cg-analyse").onclick = ()=>runContent(true);
-$("cg-go").onclick = ()=>runContent(false);
+$("cg-go").onclick = ()=>{ const sel = selectedPlats(); if (sel.length > 1) runMany(sel); else if (sel.length) runContent(false); };
+$("cg-plat-best").onclick = ()=>setPlats(bestPlats());
+$("cg-plat-all").onclick = ()=>setPlats(CG_PLATS.map(p=>p.id));
+$("cg-plat-none").onclick = ()=>setPlats([]);
 $("cg-topic").addEventListener("keydown", e=>{ if (e.key === "Enter") runContent(true); });
 loadContentFormats(false);
 
