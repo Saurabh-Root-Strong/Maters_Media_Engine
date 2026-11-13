@@ -357,7 +357,7 @@ def api_content():
         if body.get("analyse_only"):
             from engine import media
             seen_media = media.load(body.get("media_id"))
-            return jsonify(content.analyse(platform, topic, board, media=seen_media))
+            return jsonify(content.analyse(platform, topic, board, media=seen_media, notes=notes))
         if not llm.has_api_key():
             return jsonify({"error": f"{llm.key_var()} not set — add it to .env and restart. "
                                      "“Analyse trends” works without it."}), 400

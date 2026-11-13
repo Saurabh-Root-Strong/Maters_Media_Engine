@@ -77,6 +77,11 @@
   .cg-plat .best { font-size:11px; color:var(--gold, #d4a72c); font-weight:600; }
   .cg-plat-links { font-size:12.5px; color:var(--dim); margin-top:6px; }
   .cg-plat-links a { color:var(--dim); cursor:pointer; text-decoration:underline; margin-right:12px; }
+  .tm-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:10px; margin-top:8px; }
+  .tm-card { border:1px solid var(--line); border-radius:9px; padding:10px 12px; background:var(--bg); }
+  .tm-card .lbl { font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--dim); }
+  .tm-card .big { font-size:16px; font-weight:700; margin:3px 0 4px; }
+  .tm-advice { border-left:3px solid var(--gold, #d4a72c); padding:8px 12px; margin-top:8px; font-size:14.5px; line-height:1.5; }
   .cg-ready { border:1px solid var(--gold, #d4a72c); border-radius:11px; padding:12px 14px; margin:10px 0 14px; }
   .cg-ready h4 { display:flex; align-items:center; gap:8px; }
   .cg-ready .copy.all { border-color:var(--gold, #d4a72c); color:var(--gold, #d4a72c); font-weight:600; }
@@ -970,6 +975,7 @@ function evidenceHtml(d){
   return `<div class="cg-box"><h3>What the data says</h3>
     <div class="cg-read">${st.state?`<b class="st-${esc(st.state)}">${esc(STATE_NAME[st.state]||PULSE_NAME[st.state]||st.state)}</b> · `:""}${esc(st.headline)}</div>
     ${st.notes.map(n=>`<div class="tp-sig">• ${esc(n)}</div>`).join("")}
+    ${timingHtml(ev.timing)}
     ${pulseHtml(ev.lookup)}
     ${sec(`What people type — ${esc(ev.suggest_feed||"search")} suggestions`,
       (ev.searches||[]).map(s=>`<span class="cg-chip">${esc(s)}</span>`).join(""))}
@@ -993,6 +999,28 @@ function line(vals, w, h){
   const max = Math.max(...vals) || 1, n = vals.length - 1;
   const d = pts.map(p=>`${(p[0]/n*w).toFixed(1)},${(h-1-(p[1]/max)*(h-2)).toFixed(1)}`).join(" ");
   return `<svg width="${w}" height="${h}"><polyline points="${d}" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
+}
+// When to post: this week, year on year, and any occasion the post is tied to.
+const TM_NAME = {RISING:"Rising", PEAKING:"Peaking", FADING:"Fading", STEADY:"Steady", QUIET:"Quiet", EVERGREEN:"Evergreen",
+  UNKNOWN:"Not enough data", GROWING:"Growing", SHRINKING:"Shrinking", STABLE:"Stable", PEAK:"At its peak", BUILDING:"Building",
+  OFF_SEASON:"Out of season"};
+const TM_CLASS = {RISING:"RISING", GROWING:"RISING", PEAK:"RISING", BUILDING:"RISING", FADING:"FADING", SHRINKING:"FADING",
+  PEAKING:"PEAKING", OFF_SEASON:"FADING"};
+function timingHtml(t){
+  if (!t) return "";
+  const card = (lbl, state, body, spark)=>`<div class="tm-card"><div class="lbl">${lbl}</div>
+    <div class="big st-${esc(TM_CLASS[state]||"STEADY")}">${esc(TM_NAME[state]||state)}</div>${spark||""}${body}</div>`;
+  const s = t.short, l = t.long;
+  let cards = card("Short term — this week", s.label, s.reasons.map(x=>`<div class="tp-sig">• ${esc(x)}</div>`).join("") || `<div class="tp-sig">Little live data on this subject.</div>`);
+  if (l) cards += card("Long term — year on year", l.label,
+      `<div class="tp-sig">${l.growth_pct!=null?`${l.growth_pct>0?"+":""}${l.growth_pct}% Wikipedia readers of “${esc(l.article)}”, last 12 months vs the 12 before`:""}${l.season?`<br>Yearly peak: ${esc(l.season.peak_month_name)}`:""}</div>`,
+      `<span class="st-${esc(TM_CLASS[l.label]||"STEADY")}">${line(l.months.map(m=>m.views), 190, 30)}</span>`);
+  else if (t.share) cards += card("Long term", "EVERGREEN", `<div class="tp-sig">A feeling, not a topic: it does not rise and fall with the news or the year.</div>`);
+  for (const o of t.occasions||[]) cards += card(`Occasion — ${esc(o.label)}`, o.phase,
+      `<div class="tp-sig">Peaked ${esc(o.peak_day)} (${o.days_since_peak} day${o.days_since_peak==1?"":"s"} ago) · now ${o.pct_of_peak}% of that peak${o.next_peak?`<br>Back around ${esc(o.next_peak)}`:""}<br><a href="${esc(o.url)}" target="_blank" rel="noopener" style="color:inherit">Wikipedia readers, 60 days</a></div>`,
+      `<span class="st-${esc(TM_CLASS[o.phase]||"STEADY")}">${line(o.daily, 190, 30)}</span>`);
+  const err = (t.errors||[]).length ? `<div class="tp-sig" style="margin-top:6px">Could not read: ${t.errors.map(esc).join(", ")} — the advice above leaves those out. Try again in a minute.</div>` : "";
+  return `<div class="cg-sec"><h4>Timing — short term vs long term</h4><div class="tm-advice"><b>When to post:</b> ${esc(t.advice)}</div><div class="tm-grid">${cards}</div>${err}</div>`;
 }
 // This topic's own lines, looked up live — works for any subject, tracked or not.
 function pulseHtml(L){
@@ -1034,11 +1062,13 @@ function planHtml(pl){
 function readyHtml(d){
   const r = d.ready || [], rv = d.review;
   if (!r.length) return "";
-  const all = r.filter(x=>!x.note).map(x=>`${x.label.toUpperCase()}\n${x.text}`).join("\n\n");
+  const all = r.filter(x=>!x.note || x.setting).map(x=>`${x.label.toUpperCase()}\n${x.text}`).join("\n\n");
   let h = `<div class="cg-ready"><h4>Ready to post ${copyBtn(all, "copy everything", "all")}</h4>`;
+  for (const w of d.ready_warnings||[]) h += `<div class="banner err" style="display:block;margin:6px 0">⚠ Edit before posting: ${esc(w)}</div>`;
   if (rv && rv.by) h += `<div class="tp-sig">Picked by a second model that did not write it (<b>${esc(rv.by.split(":").pop())}</b>) · <b>${rv.score}/10</b> · ${esc(rv.reason||"")}${(rv.changed||[]).length?` · it rewrote the ${rv.changed.map(esc).join(", ")}`:""}</div>`;
   else h += `<div class="tp-sig">No second model was available${rv&&(rv.errors||[]).length?` (${rv.errors.map(esc).join(", ")})`:""}, so the first option of each kind is shown.</div>`;
-  for (const x of r) h += `<div class="cg-sec"><h4>${esc(x.label)} <span style="text-transform:none;letter-spacing:0" class="tp-sig">${x.text.length} chars${x.note?` · ${esc(x.note)}`:""}${x.label==="Tags"?" · YouTube Studio → Show more → Tags":""}</span> ${copyBtn(x.text)}</h4><div class="cg-pre">${esc(x.text)}</div></div>`;
+  for (const x of r) h += `<div class="cg-sec"><h4>${esc(x.label)} <span style="text-transform:none;letter-spacing:0" class="tp-sig">${x.text.length} chars${x.note?` · ${esc(x.note)}`:""}${x.label==="Tags"?` · ${x.text.split(",").length} tags · YouTube Studio → Show more → Tags`:""}${x.label==="Category"?" · YouTube Studio → Show more → Category":""}</span> ${copyBtn(x.text)}</h4><div class="cg-pre">${esc(x.text)}</div></div>`;
+  if (rv && (rv.dropped_tags||[]).length) h += `<div class="tp-sig" style="margin-top:6px">Reviewer removed ${rv.dropped_tags.length} tag${rv.dropped_tags.length==1?"":"s"} that promise what the video does not contain: ${rv.dropped_tags.map(esc).join(", ")}</div>`;
   if (rv && (rv.problems||[]).length) h += `<div class="tp-warn" style="margin-top:8px"><b>Reviewer still sees:</b><br>${rv.problems.map(esc).join("<br>")}</div>`;
   return h + `</div>`;
 }

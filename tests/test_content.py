@@ -159,7 +159,8 @@ def test_enforce_trims_tags_to_the_character_limit_and_dedupes():
                                   "thumbnail_text": [], "pinned_comment": ""}, YT)
     assert pkg["tags"][:2] == ["Jio IPO", "jio ipo review"]          # duplicate dropped, # and comma removed
     assert pkg["tags_chars"] <= 500 == YT["tags"]["max_total"]
-    assert pkg["tags_chars"] == sum(map(len, pkg["tags"])) + len(pkg["tags"]) - 1
+    # YouTube Studio's own count: letters + commas + 2 quotes round every tag with a space
+    assert pkg["tags_chars"] == sum(map(len, pkg["tags"])) + len(pkg["tags"]) - 1 + 2 * sum(" " in x for x in pkg["tags"])
     assert any("Tags trimmed" in n for n in notes)
 
 
@@ -167,13 +168,14 @@ def test_enforce_flags_long_titles_but_never_silently_cuts_them():
     long_title = "x" * 120
     pkg, notes = content.enforce({"titles": [{"text": long_title, "why": ""}, {"text": "y" * 70, "why": ""},
                                              {"text": "Jio IPO explained", "why": ""}],
-                                  "description": "d", "tags": [], "hashtags": ["#Jio IPO", "jioipo", "Markets", "x", "y"],
+                                  "description": "d", "tags": [], "hashtags": ["#Jio IPO", "jioipo", "Markets"]
+                                  + [f"h{i}" for i in range(12)],
                                   "thumbnail_text": ["one two three four five six", "ok"], "pinned_comment": ""}, YT)
     t = pkg["titles"]
     assert t[0]["text"] == long_title and t[0]["over_limit"] is True
     assert (t[1]["over_limit"], t[1]["truncated_in_search"]) == (False, True)
     assert (t[2]["over_limit"], t[2]["truncated_in_search"]) == (False, False)
-    assert pkg["hashtags"] == ["JioIPO", "Markets", "x"]              # cleaned, de-duplicated, capped at 3
+    assert pkg["hashtags"] == ["JioIPO", "Markets"] + [f"h{i}" for i in range(8)]   # cleaned, de-duplicated, capped at 10
     assert any("over the 100-character limit" in n for n in notes)
     assert any("Hashtags cut" in n for n in notes) and any("thumbnail text" in n for n in notes)
 
@@ -203,7 +205,9 @@ def test_generate_feeds_evidence_and_rules_to_the_writer_and_saves(monkeypatch):
         seen.update(system=system, user=user)
         return {"titles": [{"text": "Jio IPO Shareholder Quota Explained", "why": "top suggestion"}] * 3,
                 "description": "What the Jio IPO shareholder quota means.", "tags": ["jio ipo"],
-                "hashtags": ["JioIPO", "IPO"], "thumbnail_text": ["QUOTA TRICK?"], "pinned_comment": "Applying?"}
+                "hashtags": ["JioIPO", "IPO", "JioIPOQuota", "IPOAllotment", "RelianceJio", "IPONews",
+                             "ShareholderQuota", "JioIPODate"],
+                "thumbnail_text": ["QUOTA TRICK?"], "pinned_comment": "Applying?"}
 
     monkeypatch.setattr(content.llm, "structured", fake)
     out = content.generate("youtube", "Jio IPO", "price band, quota rules", "hinglish", board, suggest_fetch)
@@ -312,3 +316,42 @@ def test_generate_route_needs_a_key(client, monkeypatch):
     monkeypatch.setattr(app_module.llm, "has_api_key", lambda: False)
     r = client.post("/api/content", json={"platform": "youtube", "topic": "Jio IPO"})
     assert r.status_code == 400 and "Analyse trends" in r.get_json()["error"]
+
+
+
+def test_studio_counts_tags_the_way_the_user_saw_it():
+    """The 13 tags in the creator's own Studio screenshot showed 246/500."""
+    tags = ["stock market for beginners", "stock market", "trading", "intraday", "Stock market se paisa kaise kamaye",
+            "Share market", "Stock Market Ki Paathshala", "stock market emotions", "stock market india",
+            "stock market today", "sensex", "nifty 50", "trading psychology"]
+    pkg, _ = content.enforce({"tags": tags}, {"tags": {"max_total": 500, "max_each": 40}})
+    assert pkg["tags_chars"] == 246
+
+
+@pytest.mark.parametrize("ctype,name", [("mood", "People & Blogs"), ("education", "Education"),
+                                         ("news_explainer", "News & Politics"), ("humour", "Comedy"), (None, "Education")])
+def test_youtube_category_follows_what_the_video_is(ctype, name):
+    assert content.youtube_category(ctype)[0] == name
+
+
+def test_category_and_brand_last_on_youtube():
+    spec = content.formats()["youtube_shorts"]
+    r = {x["label"]: x for x in content.ready_to_post({"titles": [{"text": "T 📊"}], "description": "D",
+                                                       "hashtags": ["A", "B", "TheMarketTales"]}, spec, None, "mood")}
+    assert r["Category"]["text"] == "People & Blogs" and r["Category"]["setting"]
+
+
+@pytest.mark.parametrize("pkg,flag", [
+    ({"titles": [{"text": "Market ka mood"}], "description": "a 📊 b 💰"}, True),          # no emoji in title
+    ({"titles": [{"text": "Market ka mood 📊"}], "description": "a 📊 b 💰"}, False),
+    ({"titles": [{"text": "📊📈📉💰 mood"}], "description": "a 📊 b 💰"}, True),            # too many
+    ({"titles": [{"text": "Market ka mood 📊"}], "description": "plain"}, True),         # none in description
+])
+def test_emojis_are_counted(pkg, flag):
+    assert bool(content._emoji_problems(pkg, content.formats()["youtube_shorts"]["emojis"])) is flag
+
+
+def test_a_keyword_list_in_the_description_is_spam():
+    desc = "Market ka mood roz badalta hai.\n\nShare market share news\nStock latest news\nIntraday trading\nRakesh jhunjhunwala"
+    assert any("list of keywords" in i for i in content.lint({"description": desc, "hashtags": []}, "x", ""))
+    assert not any("list of keywords" in i for i in content.lint({"description": "One line.\nTwo line.", "hashtags": []}, "x", ""))

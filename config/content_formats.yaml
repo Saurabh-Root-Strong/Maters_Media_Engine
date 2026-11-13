@@ -8,7 +8,9 @@
 #   hashtags      min/max count
 #   thumbnail_text / cover_text   short words to put ON the image
 #   pinned_comment                first comment to pin
-# always_hashtags: your brand tag; added by code, first in the list
+# always_hashtags: your brand tag; added by code (first, or last with brand_last: true)
+# emojis:  {title: [min, max], description: [min, max]} — counted by code after writing
+# category: true = recommend a YouTube category (chosen by code from the content type)
 #   hooks         n alternative opening lines to test (caption platforms); max = characters
 # rules:   told to the writer. Reviewed 2026-10-06 — platforms change; re-check.
 # suggest: which search-suggestion feed to read (yt = YouTube search, web = Google)
@@ -16,40 +18,53 @@
 youtube:
   label: YouTube (long video)
   suggest: yt
+  always_hashtags: [TheMarketTales]
+  brand_last: true          # the first three hashtags show above the title; keep them for the subject
+  category: true
+  emojis: {title: [1, 1], description: [2, 5]}
   fields:
     titles:         {n: 3, max: 100, show: 60}
     description:    {max: 5000, hook: 150}
-    tags:           {max_total: 500, max_each: 30, aim: 10}
-    hashtags:       {min: 2, max: 3}
+    tags:           {max_total: 500, max_each: 30, aim: 40}
+    hashtags:       {min: 8, max: 10}
     thumbnail_text: {n: 3, max_words: 4}
     pinned_comment: {max: 400}
   rules:
     - Title - put the main search phrase in the first 40 characters; keep the whole title under 60 so it is not cut off in search. It must be true to the video - a title that over-promises loses viewers in the first 30 seconds, which is what YouTube now ranks on.
     - Thumbnail text - 2 to 4 words that ADD to the title, never repeat it. The title and thumbnail together must make one clear promise.
     - Description - the first 150 characters show before "more" and are read by search - state what the viewer will learn, using the main phrase naturally. Then 2-3 short paragraphs covering the points in the video with the related search phrases worked in. Never invent timestamps or chapter times - write "CHAPTERS (add your timestamps):" followed by the section names only.
-    - Tags - YouTube says tags play a minimal role, mainly for misspellings. Give the main phrase, close variants, common misspellings and the Hindi/Hinglish spelling. No unrelated popular tags.
-    - Hashtags - exactly 2 or 3; the first three show above the title. More than 15 and YouTube ignores all of them.
+    - Tags - YouTube says tags play a minimal role, mainly for misspellings, but the box is free reach - fill it to about 450-500 characters with RELEVANT tags only - the main phrase, close variants, common misspellings, Hindi and Hinglish spellings, and the specific names the video covers. Mostly one to three words each. Never a person, stock or topic the video does not cover - that is misleading metadata under YouTube's spam policy.
+    - Hashtags - 8 to 10, most important first - the first three show above the title. All must fit this video; unrelated hashtags can get a video removed. (Over 60 and YouTube ignores all of them.)
+    - Emojis - one in the title, after the search phrase, never replacing a word. Two to five in the description, at the start or end of lines. Only ones that fit the content (📊 📈 📉 💰 🪔 ✨ 🤔). Never in tags or hashtags.
+    - Never put a list of keywords or tags in the description - YouTube treats that as spam.
     - Pinned comment - one specific question that invites a real answer.
 
 youtube_shorts:
   label: YouTube Shorts
   suggest: yt
+  always_hashtags: [TheMarketTales]
+  brand_last: true
+  category: true
+  emojis: {title: [1, 2], description: [2, 4]}
   fields:
     titles:      {n: 3, max: 100, show: 40}
     description: {max: 500, hook: 100}
-    tags:        {max_total: 500, max_each: 30, aim: 8}
-    hashtags:    {min: 2, max: 3}
+    tags:        {max_total: 500, max_each: 30, aim: 40}
+    hashtags:    {min: 8, max: 10}
     pinned_comment: {max: 300}
   rules:
     - Title - under 40 characters shows fully in the Shorts feed. One sharp claim or question with the search phrase in it.
     - Shorts are ranked on how long people keep watching, not on metadata - the title only has to make the first second make sense.
     - Description - one or two lines, main phrase once.
-    - Hashtags - 2 or 3 specific ones. "#Shorts" is not needed.
-    - Tags - YouTube Studio's Tags box (under "Show more"; the phone app has none). Minor signal - the main phrase, close variants, Hinglish and Hindi spellings and common misspellings. No unrelated popular tags.
+    - Hashtags - 8 to 10, most important first - the first three show above the title. All must fit this video; unrelated hashtags can get a video removed. "#Shorts" is not needed.
+    - Tags - YouTube Studio's Tags box (under "Show more"; the phone app has none). Minor signal, but fill it to about 450-500 characters with RELEVANT tags - the main phrase, close variants, Hinglish and Hindi spellings, misspellings, the feeling or idea in plain words. Mostly one to three words each. Never a person, stock or topic the video does not cover.
+    - Emojis - one or two in the title, after the words, never replacing a word. Two to four in the description. Only ones that fit the content. Never in tags or hashtags.
+    - Never put a list of keywords or tags in the description - YouTube treats that as spam.
 
 instagram_reel:
   label: Instagram Reel
   always_hashtags: [TheMarketTales]     # added by code, so it is never misspelled
+  emojis: {description: [2, 5]}
   suggest: web
   fields:
     hooks:       {n: 3, max: 125}
@@ -63,9 +78,11 @@ instagram_reel:
     - Hashtags - 3 to 5, specific. Five is the platform's hard limit and hashtags do not add reach by themselves.
     - No links (not clickable). No engagement bait such as "tag a friend" or "comment YES".
     - Cover text - up to 5 words for the cover image; it is what shows on the profile grid.
+    - Emojis - two to five in the caption, at the start or end of lines, fitting the content. Not in the cover text.
 
 facebook:
   label: Facebook (Reel / video)
+  emojis: {title: [0, 1], description: [1, 4]}
   suggest: web
   fields:
     titles:      {n: 2, max: 100, show: 60}
@@ -80,6 +97,7 @@ facebook:
 
 twitter:
   label: X / Twitter (video post)
+  emojis: {description: [0, 2]}
   suggest: web
   fields:
     hooks:       {n: 3, max: 100}
@@ -93,6 +111,7 @@ twitter:
 
 linkedin:
   label: LinkedIn (video post)
+  emojis: {description: [0, 2]}
   suggest: web
   fields:
     hooks:       {n: 3, max: 140}

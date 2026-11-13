@@ -15,6 +15,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -35,6 +37,21 @@ def http_get(url: str, timeout: float = 25.0) -> str:
                                                "Accept-Language": "en-IN,en;q=0.9"})
     with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 — fixed https hosts
         return r.read().decode("utf-8", "replace")
+
+
+def patient(fetch):
+    """Wikimedia and others answer a burst with 429 / 503: wait and try again,
+    twice, instead of quietly losing the read."""
+    def get(url: str) -> str:
+        for wait in (1.5, 4.0, None):
+            try:
+                return fetch(url)
+            except urllib.error.HTTPError as exc:
+                if exc.code not in (429, 503) or wait is None:
+                    raise
+                time.sleep(wait)
+        raise AssertionError("unreachable")
+    return get
 
 
 def _rfc822(s: str | None) -> float | None:

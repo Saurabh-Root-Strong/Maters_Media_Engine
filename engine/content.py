@@ -24,7 +24,7 @@ from contextlib import closing
 import yaml
 
 from . import algo, analytics, llm, memory
-from .trends import insight, lookup
+from .trends import horizon, insight, lookup
 from .trends.text import tokens as _tokens
 
 _PATH = os.path.join(os.path.dirname(__file__), "..", "config", "content_formats.yaml")
@@ -226,7 +226,8 @@ def _field_brief(fields: dict) -> str:
                          f"{f.get('hook', 125)} characters must work alone.")
         elif name == "tags":
             lines.append(f"- tags: about {f.get('aim', 10)} tags, each under {f.get('max_each', 30)} "
-                         f"characters, {f['max_total']} characters in total. No # sign.")
+                         f"characters, together filling about 90% of the {f['max_total']}-character box (a tag "
+                         "with a space costs 2 extra). Mostly one to three words. Relevant only. No # sign, no emojis.")
         elif name == "hashtags":
             lines.append(f"- hashtags: between {f.get('min', 0)} and {f['max']}, without the # sign, "
                          "no spaces.")
@@ -244,6 +245,8 @@ def _field_brief(fields: dict) -> str:
 
 def _evidence_block(ev: dict, strat: dict) -> str:
     parts = [f"TREND READ: {strat['headline']}"]
+    if ev.get("timing"):
+        parts.append(horizon.brief(ev["timing"]))
     if ev.get("now"):
         parts.append("LIVE SIGNALS: " + " | ".join(ev["now"]["signals"]))
     if ev.get("searches"):
@@ -348,13 +351,83 @@ def _system(spec: dict, language: str) -> str:
         "claims — this is finance content.\n"
         "- No clickbait the video cannot pay off.\n\n"
         f"PLATFORM RULES for {spec['label']}:\n- " + "\n- ".join(spec.get("rules", []))
-        + "\n\nPRODUCE:\n" + _field_brief(spec["fields"])
+        + "\n\nPRODUCE:\n" + _field_brief(spec["fields"]) + _emoji_brief(spec.get("emojis"))
         + (f"\n\nLANGUAGE: {lang}" if lang else "")
         + memory.brand_block()
     )
 
 
 # --- enforcing the limits in code ----------------------------------------------
+
+_EMOJI = re.compile("[\U0001F300-\U0001FAFF\u2600-\u27BF\u2B50\u2B55\u2190-\u21FF\u2934\u2935]")
+
+
+def _emojis(text: str) -> int:
+    return len(_EMOJI.findall(text or ""))
+
+
+def _emoji_brief(rule: dict | None) -> str:
+    if not rule:
+        return ""
+    parts = [f"{k}: {lo} to {hi}" for k, (lo, hi) in rule.items()]
+    return ("\n- emojis — " + "; ".join(parts) + " (each title counted on its own). Relevant to the content, "
+            "after the words they decorate, never replacing a search word, never in tags or hashtags.")
+
+
+def _emoji_problems(package: dict, rule: dict | None) -> list[str]:
+    """Emojis are counted by code: too few looks flat in the feed, too many reads as spam."""
+    out = []
+    for key, field in (("title", "titles"), ("description", "description")):
+        if not rule or key not in rule:
+            continue
+        lo, hi = rule[key]
+        texts = [i.get("text", "") for i in package.get(field) or []] if field == "titles" else [package.get(field) or ""]
+        for text in texts:
+            n = _emojis(text)
+            if n < lo or n > hi:
+                where = f"“{text[:50]}”" if field == "titles" else "The description"
+                out.append(f"{where} has {n} emoji{'s' if n != 1 else ''}; use {lo} to {hi} that fit the content.")
+                break
+    return out
+
+
+# A run of short, unpunctuated lines at the end of a description is a keyword
+# list — YouTube's spam policy names "excessive tags in the description".
+def _keyword_list(text: str) -> bool:
+    run = 0
+    for line in (text or "").splitlines():
+        s = line.strip()
+        if s and len(s.split()) <= 4 and not re.search(r"[.?!:#]", s):
+            run += 1
+            if run >= 4:
+                return True
+        elif s:
+            run = 0
+    return False
+
+
+# YouTube's category tells it what kind of video this is. It is a small
+# signal, so the honest choice wins: a mood reel is not Education.
+_CATEGORY = {
+    "education": ("Education", "The video teaches something — Education is where learners look for it."),
+    "stock_analysis": ("Education", "Analysis that explains how to read a stock belongs in Education — framed as "
+                                    "learning, not tips."),
+    "news_explainer": ("News & Politics", "It reports and explains current market news. If it mainly teaches a "
+                                          "concept rather than reporting, choose Education instead."),
+    "mood": ("People & Blogs", "A feeling or a relatable moment, not a lesson. Filed under Education it promises "
+                               "learning the reel does not give."),
+    "story": ("People & Blogs", "A personal or relatable story — People & Blogs is where YouTube files creator stories."),
+    "interview": ("People & Blogs", "A conversation with a guest — People & Blogs fits interviews and podcasts."),
+    "humour": ("Comedy", "It is meant to make people laugh."),
+    "promo": ("People & Blogs", "A creator update or promotion, not a lesson."),
+}
+
+
+def youtube_category(content_type: str | None) -> tuple[str, str]:
+    return _CATEGORY.get(content_type or "", ("Education", "Finance explainers and analysis are filed under "
+                                                           "Education. If this is a feeling or a story rather than a "
+                                                           "lesson, choose People & Blogs."))
+
 
 def _clean_tag(t: str) -> str:
     return " ".join(str(t).replace("#", "").replace(",", " ").split())
@@ -389,7 +462,9 @@ def enforce(package: dict, fields: dict) -> tuple[dict, list[str]]:
             # is not something anyone searches
             if not tag or tag.lower() in seen or len(tag) > f.get("max_each", 30):
                 continue
-            cost = len(tag) + (1 if kept else 0)        # separators count toward the limit
+            # what YouTube Studio counts: commas, and 2 for the quotes round a tag with a space
+            # (checked against Studio's own counter: 13 tags shown as 246/500)
+            cost = len(tag) + (2 if " " in tag else 0) + (1 if kept else 0)
             if total + cost > f["max_total"]:
                 notes.append(f"Tags trimmed to fit the {f['max_total']}-character limit.")
                 break
@@ -489,11 +564,23 @@ _RESEARCH_TALK = re.compile(
 # "Tag a friend" and friends: Meta and LinkedIn detect it and cut reach. Hinglish too.
 _HINGLISH_BAIT = re.compile(r"\b((tag|share|follow|like|forward)\s+(karo|kro|kariye|kijiye|karein|kardo|kar\s+do)"
                             r"|(share|send|forward)\s+(this|it|ye|yeh|isse|is\s+\w+)\s+(with|to|ko))\b", re.I)
+_LEVELS = re.compile(r"\b(target|tgt|stop[- ]?loss|sl|support|resistance|buy above|sell below"
+                     r"|breakout (?:above|below)|entry (?:at|near|above|below))\b"
+                     r"[^.\n\d]{0,20}₹?\s?(?!(?:19|20)\d\d\b)\d[\d,.]*", re.I)       # a year is not a level
+# Hinglish puts the number first: "680 ka breakout level", "650 par support".
+# Only checked on stock analysis: "Nifty 25,000 ke upar" is news elsewhere.
+_LEVELS_FIRST = re.compile(r"₹?\s?(?<![\d.])(?!(?:19|20)\d\d\b)\d{2,}[\d,.]*\s+(?:ka|ke|ki|par|pe|wala|wale)\s+"
+                           r"(?:\w+\s+){0,2}(?:level|support|resistance|target|stop[- ]?loss|sl|breakout)\b", re.I)
+# Tags that promise teaching, analysis or tips: wrong on a mood or humour reel
+# (misleading metadata — the viewer clicks for a lesson that is not there).
+_PROMISE_TAG = re.compile(r"\b(analysis|tips?|strateg(y|ies)|course|for beginners|how to|kaise|sikhe|seekhe|learn"
+                          r"|tutorial|explained|intraday|day trading|swing trading|news|prediction|target|"
+                          r"stocks? to buy|best stocks?)\b", re.I)
 _PRODUCTION_TALK = re.compile(
     r"\b(footage|atmospheric|on-?screen|voice-?over|b-?roll|handle logo|night[- ]drive"
     r"|this (reel|short|clip) (captures|shows|features|displays)"
     r"|(mood|aesthetic|motivational|emotional) (reel|video|short|clip)|(reel|clip) (jo|that|which)"
-    r"|aesthetic visuals?|calming aesthetic|aesthetic reminder|visual (metaphor|reminder)|(short|quick) visual)\b", re.I)
+    r"|aesthetic|festival vibes|visual (metaphor|reminder)|(short|quick) visual)\b", re.I)
 _OTHER_LANGUAGE = {"english": re.compile(r"\bin hindi\b|\bhindi me(in)?\b|\bkya (tha|hai)\b|\bkab hua\b", re.I)}
 
 
@@ -532,6 +619,10 @@ def lint(package: dict, topic: str, notes: str, evidence: dict | None = None,
     if bait:
         issues.append(f"“{bait.group(0)}” is engagement bait, which platforms detect and cut reach for. Ask a real "
                       "question instead.")
+
+    if _keyword_list(package.get("description") or ""):
+        issues.append("The description ends in a list of keywords. Remove it — YouTube's spam policy counts "
+                      "excessive tags in the description; they belong in the Tags box.")
 
     # Describing how it was made instead of what it gives the viewer.
     m = _PRODUCTION_TALK.search(joined_all := "\n".join(text_fields))
@@ -615,6 +706,18 @@ def lint(package: dict, topic: str, notes: str, evidence: dict | None = None,
                       f"(built from: {', '.join(sorted(subject)[:5])}), not only broad ones like "
                       + ", ".join("#" + str(h) for h in package.get("hashtags", [])[:3]) + ".")
 
+    # Trading levels in public copy read as an unregistered buy/sell call
+    # (SEBI). The video can show its analysis; the title and caption should not.
+    copy = "\n".join(text_fields)
+    found_levels = list(_LEVELS.finditer(copy))
+    if (evidence or {}).get("content_type") == "stock_analysis":
+        found_levels += list(_LEVELS_FIRST.finditer(copy))
+    hits = list(dict.fromkeys(m.group(0).strip() for m in found_levels))
+    if hits:
+        issues.append(f"{', '.join('“' + h + '”' for h in hits[:6])} put trading levels in the copy. Remove every one "
+                      "and say “levels in the video” instead — targets, stop-losses and support levels in a title or "
+                      "caption read as a buy/sell call.")
+
     # A figure is only safe if the creator supplied it: the package must
     # describe the video, and headlines are not the video.
     given = {_digits(m.group(0)) for m in _FIGURE.finditer(f"{topic}\n{notes}")}
@@ -682,7 +785,8 @@ def _research(topic: str, terms: list[str], kwargs: dict, share: bool = False) -
     return best
 
 
-def analyse(platform: str, topic: str, board: dict | None = None, fetch=None, media: dict | None = None) -> dict:
+def analyse(platform: str, topic: str, board: dict | None = None, fetch=None, media: dict | None = None,
+            notes: str = "") -> dict:
     """The free half: evidence + the trend read, no LLM."""
     spec = formats().get(platform)
     if not isinstance(spec, dict) or "fields" not in spec:
@@ -691,7 +795,7 @@ def analyse(platform: str, topic: str, board: dict | None = None, fetch=None, me
     seen = (media or {}).get("seen") or {}
     terms = [t for t in seen.get("search_terms", []) if _tokens(t)]
     evidence = insight.analyse(topic, board=board, suggest_feed=spec.get("suggest"), **kwargs)
-    evidence["content_type"] = seen.get("content_type")
+    evidence["content_type"] = seen.get("content_type") or ("stock_analysis" if _LEVELS.search(notes) else None)
     share = seen.get("content_type") in _SHARE_TYPES
     if share:
         # A feeling is not on the news. Headlines and tracker counts that match
@@ -738,8 +842,31 @@ def analyse(platform: str, topic: str, board: dict | None = None, fetch=None, me
             evidence["searches"] = merged[:15]
         if evidence.get("searches"):
             evidence.setdefault("suggest_feed", "YouTube search" if spec.get("suggest") == "yt" else "Google search")
-    return {"platform": platform, "label": spec["label"], "evidence": evidence,
-            "strategy": strategy(evidence)}
+    # Short term, long term, and any occasion the post is tied to (Diwali,
+    # Budget...): when to post, and whether its framing still fits the date.
+    try:
+        evidence["timing"] = horizon.timing(topic, notes, seen, evidence, **kwargs)
+    except Exception:  # noqa: BLE001 — timing is advice on top; never lose the analysis over it
+        evidence["timing"] = None
+    look = evidence.get("lookup") or {}
+    verdict = look.get("verdict") or {}
+    found = (look.get("youtube") or {}).get("found") or 0
+    if verdict.get("state") == "DORMANT" and found >= 5 and _norm(topic) in {_norm(q) for q in evidence.get("searches") or []}:
+        # People type this exact phrase and videos answer it: steady search
+        # demand ("share market kaise sikhe"), not a dead news topic.
+        look["verdict"] = {**verdict, "state": "STEADY", "reasons": [
+            f"People type “{topic}” itself into search, and {found} recent videos answer it: steady search demand, "
+            "not a news topic."] + list(verdict.get("reasons") or [])}
+        if evidence.get("timing"):
+            evidence["timing"]["short"]["label"] = "STEADY"
+            evidence["timing"]["advice"] = "Steady search demand: package it for search — the title should answer what people type."
+    strat = strategy(evidence)
+    if len(_tokens(topic)) == 1 and not seen:
+        strat["notes"].insert(0, f"“{topic.strip()}” on its own is too broad: the research mixes every meaning of it "
+                                 "(see the odd search suggestions). Add two or three words on what the video is about.")
+    if evidence["timing"]:
+        strat["notes"].insert(0, "Timing: " + evidence["timing"]["advice"])
+    return {"platform": platform, "label": spec["label"], "evidence": evidence, "strategy": strat}
 
 
 _REVIEW_SYSTEM = (
@@ -755,6 +882,9 @@ _REVIEW_SYSTEM = (
     "like keyword stuffing). Otherwise \"\". Same language, same length or shorter.\n"
     "- hashtags: the given hashtags worth keeping, best first. Drop any that do not fit this exact video. "
     "Never add new ones.\n"
+    "- tags: the given tags worth keeping, in order. Drop every tag that promises something this video does "
+    "not contain (\"stock analysis\" or \"for beginners\" on a mood reel, a person or stock it never "
+    "mentions). Never add new ones. Empty list if the platform has no tags.\n"
     "- problems: what a viewer or the platform would still penalise in your final pick, one line each. "
     "Judge the PACKAGE, never the video: a mood or humour reel is meant to have no tips or advice, so that "
     "is never a problem. For mood or humour, a caption that explains the reel or runs past ~300 characters "
@@ -771,11 +901,12 @@ _REVIEW_SCHEMA = {
         "improved_title": {"type": "string"}, "improved_hook": {"type": "string"},
         "improved_description": {"type": "string"},
         "hashtags": {"type": "array", "items": {"type": "string"}},
+        "tags": {"type": "array", "items": {"type": "string"}},
         "problems": {"type": "array", "items": {"type": "string"}},
         "score": {"type": "integer"}, "reason": {"type": "string"},
     },
     "required": ["best_title", "best_hook", "best_cover", "improved_title", "improved_hook",
-                 "improved_description", "hashtags", "problems", "score", "reason"],
+                 "improved_description", "hashtags", "tags", "problems", "score", "reason"],
 }
 
 
@@ -800,7 +931,8 @@ def _clean_line(text: str, limit: int | None, known: str) -> bool:
     """A reviewer's rewrite is only used if it breaks none of the hard rules."""
     if not text.strip() or (limit and len(text) > limit):
         return False
-    if _PRODUCTION_TALK.search(text) or algo._BAIT.search(text) or _HINGLISH_BAIT.search(text):
+    if _PRODUCTION_TALK.search(text) or algo._BAIT.search(text) or _HINGLISH_BAIT.search(text) or _LEVELS.search(text) \
+            or _LEVELS_FIRST.search(text):
         return False
     given = {_digits(m.group(0)) for m in _FIGURE.finditer(known)}
     if any(_digits(m.group(0)) not in given for m in _FIGURE.finditer(text)):
@@ -832,10 +964,13 @@ def review(package: dict, spec: dict, platform: str, brief: str, known: str, sha
     limits = "; ".join(f"{k} max {v['max']} characters" for k, v in fields.items()
                        if isinstance(v, dict) and v.get("max") and k in ("titles", "hooks", "description"))
     system = _REVIEW_SYSTEM.format(platform=spec["label"], limits=limits or "none")
+    have = ", ".join(k for k in fields)
+    system += (f"\nThis platform's package has only these parts: {have}. Never list a missing part (a hook, a "
+               "cover, tags...) as a problem.")
     user = (f"PLATFORM RULES:\n- " + "\n- ".join(spec.get("rules") or []) + f"\n\nTHE VIDEO:\n{brief}\n\n"
             "THE PACKAGE:\n" + json.dumps({k: package.get(k) for k in
                                             ("titles", "hooks", "thumbnail_text", "cover_text", "description",
-                                             "hashtags", "pinned_comment") if package.get(k)},
+                                             "hashtags", "tags", "pinned_comment") if package.get(k)},
                                            ensure_ascii=False, indent=1))
     errors = []
     for prov, model in judges():
@@ -863,12 +998,29 @@ def review(package: dict, spec: dict, platform: str, brief: str, known: str, sha
         keep = [have[t] for t in dict.fromkeys(str(h).lstrip("#").lower() for h in r.get("hashtags") or [])
                 if t in have]
         brand = spec.get("always_hashtags") or []
-        keep = [b for b in brand] + [t for t in keep if t.lower() not in {b.lower() for b in brand}]
-        r["hashtags"] = keep if len(keep) >= (fields.get("hashtags") or {}).get("min", 0) else list(have.values())
+        rest = [t for t in keep if t.lower() not in {b.lower() for b in brand}]
+        keep = rest + brand if spec.get("brand_last") else brand + rest
+        # Fewer but relevant beats a full count: YouTube can remove a video for
+        # unrelated hashtags. Only an almost-empty pick falls back to the writer's.
+        r["hashtags"] = keep if len(keep) >= min(3, (fields.get("hashtags") or {}).get("min", 0)) else list(have.values())
         r["score"] = max(1, min(10, int(r.get("score") or 0)))
         problems = [str(x) for x in r.get("problems") or []]
+        absent = [w for k, w in (("hooks", "hook"), ("cover_text", "cover"), ("thumbnail_text", "thumbnail"),
+                                 ("tags", "tags")) if k not in fields]
+        if absent:
+            problems = [x for x in problems if not re.search(r"\b(" + "|".join(absent) + r")s?\b", x, re.I)]
         if share:
             problems = [x for x in problems if not _NOT_A_PROBLEM.search(x)]
+        given = list(package.get("tags") or [])
+        wanted = {str(x).strip().lower() for x in r.get("tags") or []}
+        kept = [t for t in given if t.lower() in wanted]
+        # Pruning only: a reviewer that keeps almost nothing misread the task.
+        if given and len(kept) >= max(5, len(given) // 3):
+            r["tags"], r["dropped_tags"] = kept, [t for t in given if t.lower() not in wanted]
+        else:
+            r["tags"], r["dropped_tags"] = given, []
+        # a problem about a tag it has already removed is solved, not still seen
+        problems = [x for x in problems if not any(d.lower() in x.lower() for d in r["dropped_tags"])]
         r.update(by=f"{prov}:{model}", changed=changed, problems=problems[:5])
         return r
     return {"by": None, "errors": errors} if errors else None
@@ -880,7 +1032,7 @@ def _same_start(hook: str, text: str) -> bool:
     return bool(a and b) and len(a & b) / len(a | b) >= 0.5
 
 
-def ready_to_post(package: dict, spec: dict, rv: dict | None = None) -> list[dict]:
+def ready_to_post(package: dict, spec: dict, rv: dict | None = None, content_type: str | None = None) -> list[dict]:
     """The pick, assembled exactly as it is pasted on this platform: one block
     per box the platform's upload screen has."""
     fields, r = spec["fields"], (rv if rv and rv.get("by") else {})
@@ -912,8 +1064,9 @@ def ready_to_post(package: dict, spec: dict, rv: dict | None = None) -> list[dic
         text = f"{desc}\n\n{line}" if line and len(desc) + len(line) + 2 <= dmax else desc
     if text.strip():
         out.append({"label": name, "text": text.strip()})
-    if package.get("tags") and "tags" in fields:
-        out.append({"label": "Tags", "text": ", ".join(package["tags"])})
+    tag_list = r.get("tags") or package.get("tags") or []
+    if tag_list and "tags" in fields:
+        out.append({"label": "Tags", "text": ", ".join(tag_list)})
     if line:
         where = "already in the caption" if "hooks" in fields else "already at the end of the description"
         out.append({"label": "Hashtags", "text": line, "note": where if line in text else ""})
@@ -921,6 +1074,9 @@ def ready_to_post(package: dict, spec: dict, rv: dict | None = None) -> list[dic
         cover = pick(key, "best_cover") if key in fields else ""
         if cover:
             out.append({"label": label, "text": cover})
+    if spec.get("category"):
+        name, why = youtube_category(content_type)
+        out.append({"label": "Category", "text": name, "note": why, "setting": True})
     if package.get("pinned_comment") and "pinned_comment" in fields:
         out.append({"label": "Pinned comment", "text": package["pinned_comment"]})
     return out
@@ -933,15 +1089,15 @@ def generate(platform: str, topic: str, notes: str = "", language: str = "englis
     from . import media as media_mod
     seen_media = media_mod.load(media_id) if media_id else None
     seen = (seen_media or {}).get("seen") or {}
-    out = analyse(platform, topic, board, fetch, media=seen_media)
+    out = analyse(platform, topic, board, fetch, media=seen_media, notes=notes)
     spec = formats()[platform]
     user = (
         f"THE VIDEO IS ABOUT: {topic.strip()}\n"
         + (f"WHAT IT COVERS (from the creator):\n{notes.strip()}\n" if notes.strip() else
            "The creator gave no further detail — stay general about the contents; do not guess specifics.\n")
         + ("\nTHE POST ITSELF:\n" + media_mod.brief_for_writer(seen_media, owner, platform) + "\n" if seen_media else "")
-        + (f"\nHOW TO PACKAGE THIS KIND OF CONTENT: {_PLAYBOOK[seen['content_type']]}\n"
-           if seen.get("content_type") in _PLAYBOOK else "")
+        + (f"\nHOW TO PACKAGE THIS KIND OF CONTENT: {_PLAYBOOK[out['evidence']['content_type']]}\n"
+           if out["evidence"].get("content_type") in _PLAYBOOK else "")
         + "\nEVIDENCE:\n" + _evidence_block(out["evidence"], out["strategy"])
         + f"\n\nWrite the {spec['label']} package now."
     )
@@ -955,7 +1111,7 @@ def generate(platform: str, topic: str, notes: str = "", language: str = "englis
 
     # Memory: what was already written on this subject, and what the watched
     # creators' own results say about titles. Both go to the planner.
-    past = past_work(topic)
+    past = past_work(topic, media_id=media_id)
     try:
         from . import recall
         learned = recall.lessons("creator")
@@ -1008,6 +1164,13 @@ def generate(platform: str, topic: str, notes: str = "", language: str = "englis
         if made_up:
             found.append(f"Chapter time {made_up[0]} is not from the video — use only the real chapter times, or none.")
         found += _limit_problems(pkg, spec["fields"])
+        found += _emoji_problems(pkg, spec.get("emojis"))
+        tf = spec["fields"].get("tags")
+        if tf and tf.get("aim", 0) >= 30:
+            used = sum(len(_clean_tag(t)) + (2 if " " in _clean_tag(t) else 0) + 1 for t in pkg.get("tags") or [])
+            if used < tf["max_total"] * 0.7:
+                found.append(f"The tags fill only about {used} of {tf['max_total']} characters. Add more RELEVANT "
+                             "tags (variants, Hinglish and Hindi spellings, misspellings) until it is nearly full.")
         if current_title and any(_norm(line) == current_title for line in _lines(pkg)):
             found.append("One title option just repeats the video's current title — every option must be a new attempt.")
         if their_names:
@@ -1038,9 +1201,25 @@ def generate(platform: str, topic: str, notes: str = "", language: str = "englis
             + "\n- ".join(issues),
             schema, max_tokens=3000)
         issues, revised = check(package), True
+    must = [i for i in issues if "trading levels" in i]
+    if must:
+        # Not style: a level in the copy is a regulatory problem. One more try, on that alone.
+        package = llm.structured(
+            system,
+            user + "\n\nYOUR PREVIOUS DRAFT:\n" + json.dumps(package, ensure_ascii=False)
+            + "\n\nCOMPLIANCE — this cannot be posted as it is. Fix exactly this and change nothing else:\n- "
+            + "\n- ".join(must),
+            schema, max_tokens=3000)
+        issues = check(package)
     for tag in reversed(spec.get("always_hashtags") or []):
         have = [h for h in package.get("hashtags", []) if str(h).lstrip("#").lower() != tag.lower()]
-        package["hashtags"] = [tag] + have
+        if spec.get("brand_last"):
+            cap = (spec["fields"].get("hashtags") or {}).get("max", 99)
+            package["hashtags"] = have[:cap - 1] + [tag]
+        else:
+            package["hashtags"] = [tag] + have
+    if seen.get("content_type") in _SHARE_TYPES and package.get("tags"):
+        package["tags"] = [t for t in package["tags"] if not _PROMISE_TAG.search(str(t))]
     package, limit_notes = enforce(package, spec["fields"])
     # A second, stronger model picks what to paste. It never blocks the result.
     brief = (media_mod.brief_for_writer(seen_media, owner, platform) if seen_media
@@ -1049,14 +1228,15 @@ def generate(platform: str, topic: str, notes: str = "", language: str = "englis
         rv = review(package, spec, platform, brief, known, seen.get("content_type") in _SHARE_TYPES)
     except Exception as exc:  # noqa: BLE001
         rv = {"by": None, "errors": [type(exc).__name__]}
-    out.update({"review": rv, "ready": ready_to_post(package, spec, rv)})
+    out.update({"review": rv, "ready": ready_to_post(package, spec, rv, out["evidence"].get("content_type")),
+                "ready_warnings": [i for i in issues if "trading levels" in i]})
     out.update({"package": package, "limit_notes": limit_notes, "quality_notes": issues, "plan": plan,
                 "past": [{k: p[k] for k in ("created_at", "platform", "topic", "lines")} for p in past],
                 "media_used": bool(seen_media), "owner": owner if seen_media else None,
                 "learned": learned,
                 "revised": revised, "language": language, "fields": spec["fields"]})
     try:
-        _save(platform, topic, out["strategy"].get("state"), package, plan, language)
+        _save(platform, topic, out["strategy"].get("state"), package, plan, language, media_id)
     except Exception:  # noqa: BLE001 — history is a convenience; never fail the result over it
         pass
     return out
@@ -1066,19 +1246,19 @@ def _db():
     conn = analytics.connect()
     conn.executescript(_SCHEMA_SQL)
     have = {r["name"] for r in conn.execute("PRAGMA table_info(content_packages)")}
-    for col in ("plan", "language"):               # added after the first release
+    for col in ("plan", "language", "media_id"):   # added after the first release
         if col not in have:
             conn.execute(f"ALTER TABLE content_packages ADD COLUMN {col} TEXT")  # noqa: S608 — fixed names
     return conn
 
 
 def _save(platform: str, topic: str, trend_state: str | None, package: dict,
-          plan: dict | None = None, language: str = "") -> None:
+          plan: dict | None = None, language: str = "", media_id: str | None = None) -> None:
     with closing(_db()) as conn:
-        conn.execute("INSERT INTO content_packages (created_at, platform, topic, trend_state, package, plan, language)"
-                     " VALUES (?,?,?,?,?,?,?)",
+        conn.execute("INSERT INTO content_packages (created_at, platform, topic, trend_state, package, plan, language,"
+                     " media_id) VALUES (?,?,?,?,?,?,?,?)",
                      (time.time(), platform, topic[:300], trend_state, json.dumps(package, ensure_ascii=False),
-                      json.dumps(plan, ensure_ascii=False) if plan else None, language))
+                      json.dumps(plan, ensure_ascii=False) if plan else None, language, media_id))
         conn.commit()
 
 
@@ -1091,6 +1271,9 @@ def _limit_problems(package: dict, fields: dict) -> list[str]:
         for item in (package.get(key) or []) if limit else []:
             if len(item.get("text", "")) > limit:
                 out.append(f"“{item['text'][:60]}…” is {len(item['text'])} characters; the limit is {limit}. Shorten it.")
+            elif key == "titles" and (fields[key].get("show") or 999) <= 40 and len(item.get("text", "")) > fields[key]["show"]:
+                out.append(f"“{item['text']}” is {len(item['text'])} characters; the feed shows only the first "
+                           f"{fields[key]['show']}. Shorten it.")
     for key in ("thumbnail_text", "cover_text"):
         words = (fields.get(key) or {}).get("max_words")
         for option in (package.get(key) or []) if words else []:
@@ -1124,16 +1307,29 @@ def _norm(line: str) -> str:
     return re.sub(r"[^\w]+", " ", line.lower()).strip()
 
 
-def past_work(topic: str, limit: int = 6) -> list[dict]:
+SAME_VIDEO_HOURS = 24
+
+
+def past_work(topic: str, limit: int = 6, media_id: str | None = None, now: float | None = None) -> list[dict]:
     """Earlier packages on the same subject — matched on the subject's words,
-    so "Jio IPO" and "Jio IPO shareholder quota" find each other."""
+    so "Jio IPO" and "Jio IPO shareholder quota" find each other.
+
+    Other versions of THIS video (another platform, a retry) are left out:
+    the point is not repeating yourself across videos, and the Shorts and
+    Instagram versions of one reel should be free to share their best line."""
     q = _tokens(topic)
     if not q:
         return []
+    now = time.time() if now is None else now
     out = []
     with closing(_db()) as conn:
-        for r in conn.execute("SELECT created_at, platform, topic, trend_state, package FROM content_packages"
+        for r in conn.execute("SELECT created_at, platform, topic, trend_state, package, media_id FROM content_packages"
                               " ORDER BY created_at DESC LIMIT 400"):
+            if media_id and r["media_id"] == media_id:
+                continue
+            if not r["media_id"] and _norm(r["topic"]) == _norm(topic) \
+                    and now - r["created_at"] < SAME_VIDEO_HOURS * 3600:
+                continue                              # the same typed topic today: a retry of the same video
             t = _tokens(r["topic"])
             if not t or len(q & t) / len(q | t) < 0.5:
                 continue

@@ -67,7 +67,7 @@ _MONTHS = ("January", "February", "March", "April", "May", "June", "July", "Augu
            "October", "November", "December")
 
 
-CACHE_VERSION = "v4"             # bump when what a cached part contains changes
+CACHE_VERSION = "v5"             # bump when what a cached part contains changes
 
 
 def _key(topic: str) -> str:
@@ -187,8 +187,14 @@ def interest_pulse(topic: str, now: float, fetch) -> dict | None:
     best = None
     for h in hits.get("query", {}).get("search", []):
         title = h.get("title", "")
-        if not (tokens(title) & q):
-            continue                      # an article sharing no word with the topic is a different subject
+        # The article must BE the subject: every word of its title in the topic
+        # ("Oil India"), or at least two of the topic's naming words. One shared
+        # word picked "Big Oil" for an Oil India results story.
+        t = tokens(title)
+        words = set(re.findall(r"\w+", title.lower())) - {"of", "the", "and", "in", "a"}
+        whole = bool(words) and words <= set(re.findall(r"\w+", topic.lower())) and bool(t & q)
+        if not whole and len(t & q) < min(2, len(q)):
+            continue
         try:
             views = _article_views(title, now, fetch)
         except Exception:  # noqa: BLE001
@@ -345,7 +351,7 @@ def research(topic: str, now: float | None = None, fetch=None, youtube: bool = T
     """Everything above for one topic, cached. Never raises: a source that
     fails is reported in `errors` and left out of the verdict."""
     now = time.time() if now is None else now
-    fetch = fetch or (lambda url: sources.http_get(url, timeout=15))
+    fetch = fetch or sources.patient(lambda url: sources.http_get(url, timeout=15))
     key = _key(topic)
     out: dict = {"topic": topic, "errors": [], "cached": []}
     with closing(store.connect()) as conn:

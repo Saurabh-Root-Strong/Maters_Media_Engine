@@ -337,3 +337,19 @@ def test_research_tries_a_second_term_only_when_the_first_is_thin(monkeypatch):
     assert calls == ["first", "second"]
     calls.clear()
     assert content._research("t", ["second", "first"], {})["term"] == "second" and calls == ["second"]
+
+
+def test_a_wikipedia_article_must_be_the_subject_not_share_one_word():
+    from engine.trends import lookup as L
+    hits = {"query": {"search": [{"title": "Big Oil"}, {"title": "Oil India"}]}}
+    views = {"Big_Oil": [9000] * 60, "Oil_India": [300] * 60}
+
+    def fetch(url):
+        if "list=search" in url:
+            return json.dumps(hits)
+        name = url.split("/user/")[1].split("/")[0]
+        if "/monthly/" in url:
+            return json.dumps({"items": []})
+        return json.dumps({"items": [{"views": v} for v in views[name]]})
+    i = L.interest_pulse("Oil India profit doubles on crude", NOW, fetch)
+    assert i["article"] == "Oil India"

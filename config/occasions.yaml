@@ -1,0 +1,30 @@
+# Occasions a post can be tied to: festivals, market days, seasons.
+#
+# match:   a regular expression over the topic, the creator's notes and what was
+#          seen in the video (case-insensitive)
+# article: the English Wikipedia article whose daily readers show when the
+#          occasion peaks and how fast it fades. No dates are written here —
+#          the readers say when it happened, and three years of monthly
+#          readers say when it comes back.
+
+- {label: Diwali,            article: Diwali,                   match: "diwali|deepawali|deepavali|deepotsav"}
+- {label: Dhanteras,         article: Dhanteras,                match: "dhanteras"}
+- {label: Muhurat trading,   article: Muhurat trading,          match: "muhurat|muhurta"}
+- {label: Holi,              article: Holi,                     match: "\\bholi\\b"}
+- {label: Navratri,          article: Navaratri,                match: "navratri|navaratri|garba|dandiya"}
+- {label: Durga Puja,        article: Durga Puja,               match: "durga puja"}
+- {label: Ganesh Chaturthi,  article: Ganesh Chaturthi,         match: "ganesh chaturthi|ganpati|ganeshotsav"}
+- {label: Raksha Bandhan,    article: Raksha Bandhan,           match: "raksha ?bandhan|\\brakhi\\b(?!\\s+sawant)"}
+- {label: Eid,               article: Eid al-Fitr,              match: "\\beid\\b"}
+- {label: Christmas,         article: Christmas,                match: "christmas|\\bxmas\\b"}
+- {label: New Year,          article: New Year's Day,           match: "happy new year|new year'?s|new year (20\\d\\d|wish|party|resolution|eve)|naya saal"}
+- {label: Makar Sankranti,   article: Makar Sankranti,          match: "sankranti|pongal|lohri|uttarayan"}
+- {label: Akshaya Tritiya,   article: Akshaya Tritiya,          match: "akshaya tritiya|akha teej"}
+- {label: Onam,              article: Onam,                     match: "\\bonam\\b"}
+- {label: Chhath,            article: Chhath,                   match: "\\bchhath\\b"}
+- {label: Valentine's Day,   article: Valentine's Day,          match: "valentine"}
+- {label: Independence Day,  article: Independence Day (India), match: "independence day|15 august|swatantrata diwas"}
+- {label: Republic Day,      article: Republic Day (India),     match: "republic day|26 january|gantantra diwas"}
+- {label: Union Budget,      article: Union budget of India,    match: "union budget|budget 20\\d\\d|budget day|\\bbajat\\b"}
+- {label: Income tax filing, article: Income tax in India,      match: "\\bitr\\b|income tax return|tax filing"}
+- {label: IPL,               article: Indian Premier League,    match: "\\bipl\\b|indian premier league"}

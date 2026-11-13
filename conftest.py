@@ -40,3 +40,6 @@ def _isolate_output(tmp_path, monkeypatch):
     from engine import content
     monkeypatch.setattr(content, "lookup", types.SimpleNamespace(
         research=lambda topic, **kw: {"topic": topic, "errors": [], "verdict": {}}))
+    # ...and the timing read (Wikipedia readers of occasions) likewise.
+    monkeypatch.setattr(content, "horizon", types.SimpleNamespace(
+        timing=lambda *a, **k: None, brief=lambda t: ""))

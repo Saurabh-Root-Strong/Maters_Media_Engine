@@ -192,6 +192,17 @@ products, so avoid unreleased or confidential videos on a free key. Readings are
 kept in `analytics.db` for 14 days, so a repeat costs nothing. The AI can mishear
 names and numbers: check the notes before suggesting.
 
+## Timing: short term, long term, occasions
+
+Every analysis now says when to post. Short term is this week (trend board,
+YouTube uploads, news, readers). Long term is year on year: twelve months of
+Wikipedia readers against the twelve before, and the subject's yearly peak.
+When the post mentions an occasion listed in `config/occasions.yaml` (Diwali,
+Budget, IPL, Holi...), that occasion's own readers show when it peaked, how far
+it has fallen and when it returns. No dates are hard-coded. The advice goes to
+the writer, so a post made after Diwali is not framed as if Diwali were still
+coming.
+
 ## Content generator (packaging a video you already made)
 
 Left menu → **Content generator**. Pick the platform (YouTube, Shorts, Instagram

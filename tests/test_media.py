@@ -348,8 +348,17 @@ def run_writer(monkeypatch, media_result, owner, replies):
     return out, prompts
 
 
+# Compliant with the YouTube rules that are not under test here (emojis, a full tag box,
+# 8+ hashtags), so each test's rewrite count is about the one thing it checks.
+_FULL_TAGS = [f"harshad mehta {w}" for w in ("scam", "story", "1992", "case", "bank", "receipts", "sebi", "bse",
+                                             "biography", "explained", "hindi", "documentary", "movie", "series",
+                                             "news", "life", "family", "trial", "court", "death")]
+
+
 def package(desc, title="Harshad Mehta: how bank receipts moved 1992"):
-    return {"titles": [{"text": title, "why": "w"}], "description": desc, "tags": ["harshad mehta"], "hashtags": ["HarshadMehta", "Scam1992"],
+    return {"titles": [{"text": title + " 📉", "why": "w"}], "description": desc + "\n📊 💰",
+            "tags": _FULL_TAGS, "hashtags": ["HarshadMehta", "Scam1992", "BigBull", "SEBI", "BSE", "StockMarketScam",
+                                             "IndianMarkets", "MarketHistory"],
             "thumbnail_text": ["RS 4,000 CRORE?"], "pinned_comment": "Which reform mattered most?"}
 
 
@@ -603,7 +612,8 @@ def test_a_feeling_is_not_researched_through_the_news(monkeypatch):
 
 @pytest.mark.parametrize("text", ["Ek aesthetic mood reel jo market ko compare karti hai",
                                   "Yeh aesthetic visual metaphor un sabhi ke liye hai", "A short visual reminder on calm",
-                                  "A calming aesthetic reminder for traders"])
+                                  "A calming aesthetic reminder for traders",
+                                  "Daily shifts aur festival vibes ka ye aesthetic moment!"])
 def test_mood_reel_wording_is_production_talk(text):
     assert "how the post was made" in " ".join(content.lint({"description": text, "hashtags": []}, "x", ""))
 
@@ -650,7 +660,7 @@ def test_reviewer_picks_and_its_rewrite_is_checked(monkeypatch):
     rv = content.review(PKG, spec, "youtube_shorts", "brief", "")
     assert rv["by"] == "gemini:judge-model" and rv["score"] == 10
     assert rv["improved_title"] == "" and rv["changed"] == []             # bait rewrite refused
-    assert rv["hashtags"] == ["MarketVolatility", "Sensex"]               # nothing invented
+    assert rv["hashtags"] == ["MarketVolatility", "Sensex", "TheMarketTales"]   # nothing invented; brand last on YouTube
     assert content.ready_to_post(PKG, spec, rv)[0]["text"] == "Market volatility ke beech sukoon?"
 
 
@@ -697,6 +707,32 @@ def test_a_reviewer_server_error_is_retried_once(monkeypatch):
     assert len(calls) == 2
 
 
+def test_reviewer_prunes_tags_but_never_adds_or_empties(monkeypatch):
+    monkeypatch.setenv("MEDIA_ENGINE_JUDGES", "gemini:judge")
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(content.llm, "last_writer", "gemini:writer")
+    tags = ["stock market emotions", "market mood", "trading psychology", "dalal street", "market volatility",
+            "portfolio swings", "stock analysis", "day trading"]
+    base = {"best_title": 0, "best_hook": 0, "best_cover": 0, "improved_title": "", "improved_hook": "",
+            "improved_description": "", "hashtags": [], "problems": [], "score": 7, "reason": "r"}
+    answer = dict(base, tags=tags[:6] + ["invented tag"])
+    monkeypatch.setattr(content.llm, "structured_on", lambda *a, **k: dict(answer))
+    spec = content.formats()["youtube_shorts"]
+    rv = content.review({**PKG, "tags": tags}, spec, "youtube_shorts", "b", "")
+    assert rv["tags"] == tags[:6] and rv["dropped_tags"] == ["stock analysis", "day trading"]
+    r = {x["label"]: x["text"] for x in content.ready_to_post({**PKG, "tags": tags}, spec, rv, "mood")}
+    assert "stock analysis" not in r["Tags"] and "invented tag" not in r["Tags"]
+    answer = dict(base, tags=["market mood"])                         # keeping almost nothing = misread
+    assert content.review({**PKG, "tags": tags}, spec, "youtube_shorts", "b", "")["tags"] == tags
+
+
+@pytest.mark.parametrize("tag,drop", [("stock analysis", True), ("stock market for beginners", True), ("day trading", True),
+                                      ("share market kaise sikhe", True), ("market mood", False),
+                                      ("trading psychology", False), ("stock market emotions", False)])
+def test_a_mood_reels_tags_never_promise_a_lesson(tag, drop):
+    assert bool(content._PROMISE_TAG.search(tag)) is drop
+
+
 def test_a_writer_never_reviews_itself(monkeypatch):
     monkeypatch.setenv("MEDIA_ENGINE_JUDGES", "gemini:same")
     monkeypatch.setenv("GEMINI_API_KEY", "x")
@@ -707,6 +743,101 @@ def test_a_writer_never_reviews_itself(monkeypatch):
 def test_reviewer_rewrite_with_a_new_figure_is_refused():
     assert not content._clean_line("Nifty up 12% today", 100, "")
     assert content._clean_line("Nifty up 12% today", 100, "it rose 12%")
+
+
+# --- audit 2026-11-13 ---------------------------------------------------------------
+
+@pytest.mark.parametrize("text,flag", [
+    ("Target 720, stop-loss 630", True), ("Buy above ₹650 for a target of 720", True), ("SL 630", True),
+    ("Nifty target for 2027?", False), ("The stop-loss mistake every trader makes", False),
+    ("Support at 650 holds", True), ("Breakout above 680 on volume", True), ("Tata Motors Share Analysis: Target 720?", True),
+])
+def test_trading_levels_never_go_into_the_copy(text, flag):
+    issues = content.lint({"description": text, "hashtags": []}, "x", "target 720 stop-loss 630 sl 630 650")
+    assert any("put trading levels in the copy" in i for i in issues) is flag
+
+
+@pytest.mark.parametrize("text,flag", [
+    ("Kya 680 ka volume breakout level agla move dega?", True), ("650 par strong support hai", True),
+    ("Top 10 breakout stocks", False), ("2026 ka budget kaisa raha", False),
+])
+def test_hinglish_number_first_levels_are_caught_on_stock_analysis(text, flag):
+    ev = {"content_type": "stock_analysis"}
+    issues = content.lint({"description": text, "hashtags": []}, "x", "", ev)
+    assert any("put trading levels in the copy" in i for i in issues) is flag
+    news = content.lint({"description": text, "hashtags": []}, "x", "", {"content_type": "news_explainer"})
+    assert not any("put trading levels" in i for i in news) or not flag
+
+
+def test_every_level_is_listed_and_a_reviewer_cannot_add_one():
+    issues = content.lint({"description": "Support at 650, stop-loss at 630", "hashtags": []}, "x", "")
+    hit = next(i for i in issues if "trading levels" in i)
+    assert "Support at 650" in hit and "stop-loss at 630" in hit
+    assert not content._clean_line("Tata Motors: Target 720?", 100, "target 720")
+
+
+def test_levels_that_survive_get_a_dedicated_compliance_rewrite(monkeypatch):
+    drafts = [{"titles": [{"text": "Tata Motors: Target 720?"}], "description": "Tata Motors levels.", "hashtags": ["TataMotors"],
+               "tags": [], "pinned_comment": "Kya lagta hai?"}] * 2 + [
+              {"titles": [{"text": "Tata Motors: levels to watch"}], "description": "Tata Motors levels in the video.",
+               "hashtags": ["TataMotors"], "tags": [], "pinned_comment": "Kya lagta hai?"}]
+    prompts = []
+
+    def fake(system, user, schema, max_tokens=0):
+        if "audience_intent" in schema["properties"]:
+            return {"audience_intent": "a", "angle": "b", "promise": "c", "primary_keyword": "d",
+                    "secondary_keywords": [], "specific_hashtags": [], "avoid": "e"}
+        prompts.append(user)
+        return dict(drafts[len(prompts) - 1])
+    monkeypatch.setattr(content.llm, "structured", fake)
+    out = content.generate("youtube_shorts", "Tata Motors share analysis", "target 720, stop-loss 630")
+    assert "COMPLIANCE — this cannot be posted" in prompts[2]
+    assert out["ready_warnings"] == [] and out["ready"][0]["text"] == "Tata Motors: levels to watch"
+
+
+def test_a_shorts_title_longer_than_the_feed_shows_goes_back():
+    f = content.formats()
+    assert content._limit_problems({"titles": [{"text": "x" * 45}]}, f["youtube_shorts"]["fields"])
+    assert not content._limit_problems({"titles": [{"text": "x" * 45}]}, f["youtube"]["fields"])     # long titles show 60+
+
+
+def test_reviewer_never_asks_for_parts_the_platform_lacks(monkeypatch):
+    monkeypatch.setenv("MEDIA_ENGINE_JUDGES", "gemini:judge")
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(content.llm, "last_writer", "gemini:writer")
+    answer = {"best_title": 0, "best_hook": 0, "best_cover": 0, "improved_title": "", "improved_hook": "",
+              "improved_description": "", "hashtags": [], "score": 7, "reason": "r",
+              "problems": ["No hook or thumbnail cover options were included.", "Pinned comment is a statement"]}
+    monkeypatch.setattr(content.llm, "structured_on", lambda *a, **k: dict(answer))
+    rv = content.review(PKG, content.formats()["youtube_shorts"], "youtube_shorts", "b", "")
+    assert rv["problems"] == ["Pinned comment is a statement"]
+
+
+def test_typed_notes_with_levels_are_treated_as_stock_analysis(monkeypatch):
+    out = content.analyse("youtube", "Tata Motors share analysis", notes="Support 650, target 720, stop-loss 630")
+    assert out["evidence"]["content_type"] == "stock_analysis"
+
+
+def test_other_versions_of_the_same_video_are_not_already_written():
+    content._save("youtube_shorts", "stock market emotions", None, {"titles": [{"text": "Har din alag mood"}]}, media_id="v1")
+    content._save("youtube", "stock market emotions", None, {"titles": [{"text": "Another video's title"}]}, media_id="v2")
+    assert [p["lines"] for p in content.past_work("stock market emotions", media_id="v1")] == [["Another video's title"]]
+    content._save("youtube", "jio ipo", None, {"titles": [{"text": "Jio IPO explained"}]})
+    assert content.past_work("Jio IPO") == []                                   # a retry today
+    assert content.past_work("Jio IPO", now=content.time.time() + 2 * 86400)    # a new video days later
+
+
+def test_an_exact_search_phrase_with_videos_is_steady_not_dormant(monkeypatch):
+    monkeypatch.setattr(content.lookup, "research", lambda term, **kw: {
+        "youtube": {"found": 10}, "news": {"articles": 0}, "verdict": {"state": "DORMANT", "reasons": []}, "errors": []})
+    monkeypatch.setattr(content.insight, "suggest", lambda *a, **k: ["share market kaise sikhe", "share market kaise sikhe hindi"])
+    out = content.analyse("youtube", "share market kaise sikhe")
+    assert out["evidence"]["lookup"]["verdict"]["state"] == "STEADY" and out["strategy"]["state"] != "DORMANT"
+
+
+def test_one_word_is_flagged_as_too_broad():
+    out = content.analyse("youtube", "gold")
+    assert "too broad" in out["strategy"]["notes"][0]
 
 
 # --- routes ----------------------------------------------------------------------

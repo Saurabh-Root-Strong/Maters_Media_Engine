@@ -204,7 +204,7 @@ def test_a_yearly_season_is_found_only_when_it_recurs():
 
     one_off = {ym: 1000 for ym in months}
     one_off[(today.year - 1, 10)] = 50_000                         # a single freak spike is not a season
-    r = lookup.research("other subject mehta", now=NOW, fetch=topic_fetch(1000, one_off), youtube=False)
+    r = lookup.research("harshad mehta securities", now=NOW, fetch=topic_fetch(1000, one_off), youtube=False)
     assert r["interest"]["season"] is None
 
 
