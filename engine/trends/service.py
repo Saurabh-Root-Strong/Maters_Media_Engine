@@ -788,6 +788,8 @@ class TrendService:
                     from .. import recall
                     recall.snapshot_videos()
                     recall.grade_calls()
+                    from .. import tracking
+                    tracking.refresh()          # your own posted videos, every few hours
                 except Exception:  # noqa: BLE001 — learning must never stop collecting
                     pass
             finally:

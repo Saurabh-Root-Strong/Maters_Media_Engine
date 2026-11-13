@@ -367,6 +367,15 @@
 <section class="view" id="view-posts">
   <div class="pagehead"><h2>My posts &amp; results</h2></div>
   <div class="pagesub">Every post you publish is logged with the trend state its topic was in. Enter the numbers to see what works for you.</div>
+  <div class="panelbox">
+    <h3 style="margin:0 0 4px">Your posted videos — followed automatically</h3>
+    <div class="tp-sig">Paste a YouTube or Shorts link after posting. Its views, likes and comments are re-read every few hours for a month and compared with your channel's usual pace for the same kind of video.</div>
+    <div style="display:flex;gap:8px;margin-top:8px"><input class="cg-in" id="tr-url" placeholder="https://youtube.com/shorts/…">
+      <button class="tp-btn gold" id="tr-go">Follow</button></div>
+    <div class="tp-sig" id="tr-st" style="margin-top:6px"></div>
+    <div id="tr-lessons" style="margin-top:10px"></div>
+    <div id="tr-list" style="margin-top:8px"></div>
+  </div>
   <div class="panelbox statline" id="tp-postsum"></div>
   <div class="rows" id="tp-postlist"></div>
 </section>
@@ -1058,19 +1067,49 @@ function planHtml(pl){
     ${row("Who is searching", pl.audience_intent)}${row("The angle", pl.angle)}${row("The promise", pl.promise)}
     ${row("Lead keyword", pl.primary_keyword)}${row("Also work in", (pl.secondary_keywords||[]).join(" · "))}${row("Stay away from", pl.avoid)}</div>`;
 }
+// On Shorts and Reels, whether people keep watching decides reach far more than
+// any title. What the watched video itself should change comes first.
+function fixFirstHtml(d){
+  if (!d.media_used || d.owner === "theirs" || !MW || !MW.seen) return "";
+  const s = MW.seen, items = [];
+  for (const e of s.text_errors||[]) items.push(`On-screen text: <b>${esc(e)}</b> — text in the video cannot be fixed after posting.`);
+  if (s.hook_rating != null && s.hook_rating <= 3 && s.hook_fix) items.push(`First 2 seconds (hook ${s.hook_rating}/5): ${esc(s.hook_fix)}`);
+  if ((s.retention_risks||[]).length) items.push(`Where viewers may leave: ${esc(s.retention_risks[0])}`);
+  if (s.visual_rating != null && s.visual_rating <= 3 && s.visual_fix) items.push(`First frame / cover (${s.visual_rating}/5): ${esc(s.visual_fix)}`);
+  if (!items.length) return "";
+  return `<div class="tp-warn" style="margin:8px 0 12px"><b>Before posting — change these in the video. On Shorts and Reels they decide reach far more than the title:</b><br>• ${items.join("<br>• ")}</div>`;
+}
+function followHtml(d){
+  if (!d.package_id || !/^youtube/.test(d.platform||"")) return "";
+  return `<div class="tp-sig" style="margin-top:10px">Posted it? Paste the YouTube link — the engine follows its results and learns what works for your channel.
+    <div style="display:flex;gap:8px;margin-top:6px"><input class="cg-in" data-follow-url="${d.package_id}" placeholder="https://youtube.com/shorts/…">
+    <button class="tp-btn" data-follow="${d.package_id}">Follow results</button></div><span class="tp-sig" data-follow-st="${d.package_id}"></span></div>`;
+}
+document.addEventListener("click", async e=>{
+  const b = e.target.closest("[data-follow]");
+  if (!b) return;
+  const id = +b.dataset.follow, url = document.querySelector(`[data-follow-url="${id}"]`).value.trim(),
+        st = document.querySelector(`[data-follow-st="${id}"]`);
+  if (!url) { st.textContent = "Paste the link first."; return; }
+  b.disabled = true; st.textContent = "Reading the video…";
+  try { const v = await api("/api/track", {url, package_id:id});
+        st.textContent = `Following “${v.title}”: ${(v.views||0).toLocaleString()} views so far. Results build up under My posts & results.`; }
+  catch(err) { st.textContent = err.message; }
+  finally { b.disabled = false; }
+});
 // The pick, assembled per upload box, so it can be pasted straight in.
 function readyHtml(d){
   const r = d.ready || [], rv = d.review;
   if (!r.length) return "";
   const all = r.filter(x=>!x.note || x.setting).map(x=>`${x.label.toUpperCase()}\n${x.text}`).join("\n\n");
-  let h = `<div class="cg-ready"><h4>Ready to post ${copyBtn(all, "copy everything", "all")}</h4>`;
+  let h = fixFirstHtml(d) + `<div class="cg-ready"><h4>Ready to post ${copyBtn(all, "copy everything", "all")}</h4>`;
   for (const w of d.ready_warnings||[]) h += `<div class="banner err" style="display:block;margin:6px 0">⚠ Edit before posting: ${esc(w)}</div>`;
   if (rv && rv.by) h += `<div class="tp-sig">Picked by a second model that did not write it (<b>${esc(rv.by.split(":").pop())}</b>) · <b>${rv.score}/10</b> · ${esc(rv.reason||"")}${(rv.changed||[]).length?` · it rewrote the ${rv.changed.map(esc).join(", ")}`:""}</div>`;
   else h += `<div class="tp-sig">No second model was available${rv&&(rv.errors||[]).length?` (${rv.errors.map(esc).join(", ")})`:""}, so the first option of each kind is shown.</div>`;
   for (const x of r) h += `<div class="cg-sec"><h4>${esc(x.label)} <span style="text-transform:none;letter-spacing:0" class="tp-sig">${x.text.length} chars${x.note?` · ${esc(x.note)}`:""}${x.label==="Tags"?` · ${x.text.split(",").length} tags · YouTube Studio → Show more → Tags`:""}${x.label==="Category"?" · YouTube Studio → Show more → Category":""}</span> ${copyBtn(x.text)}</h4><div class="cg-pre">${esc(x.text)}</div></div>`;
   if (rv && (rv.dropped_tags||[]).length) h += `<div class="tp-sig" style="margin-top:6px">Reviewer removed ${rv.dropped_tags.length} tag${rv.dropped_tags.length==1?"":"s"} that promise what the video does not contain: ${rv.dropped_tags.map(esc).join(", ")}</div>`;
   if (rv && (rv.problems||[]).length) h += `<div class="tp-warn" style="margin-top:8px"><b>Reviewer still sees:</b><br>${rv.problems.map(esc).join("<br>")}</div>`;
-  return h + `</div>`;
+  return h + followHtml(d) + `</div>`;
 }
 function packageHtml(d){
   const p = d.package, f = d.fields, descName = (f.description && f.description.name) || "Description";
@@ -1355,8 +1394,34 @@ $("tp-day").onchange = ()=>loadHistory($("tp-day").value);
 // --- my posts & results ---
 const MFIELDS = ["impressions","likes","comments","shares","saves","clicks"];
 function pct(x){ return (x*100).toFixed(1)+"%"; }
+async function loadFollowed(){
+  try {
+    const d = await (await fetch("/api/track")).json(), L = d.lessons;
+    const vs = x => x==null ? "" : `<b class="${x>=1.5?"up":x<0.7?"down":"flat"}">${x}× your usual</b>`;
+    $("tr-list").innerHTML = d.videos.length ? d.videos.map(v=>`<div class="cg-line"><span class="num">${(v.views||0).toLocaleString()}</span>
+      <span><a href="${esc(v.url)}" target="_blank" rel="noopener" style="color:inherit">${esc(v.title||v.video_id)}</a><br>
+      <span class="tp-sig">${v.kind==="short"?"Short":v.kind||""} · ${v.age_days} days old · ${(v.views_per_hour||0).toLocaleString()} views/h ${vs(v.vs_usual)}
+      ${v.like_rate!=null?` · ${(v.like_rate*100).toFixed(1)}% liked`:""} · ${v.comments??0} comments${v.content_type?` · ${esc(v.content_type.replace("_"," "))}`:""}
+      ${v.posted_hour_ist!=null?` · posted ${v.posted_hour_ist}:00 IST`:""}${v.package?` · package: ${esc(v.package.topic)}`:""}</span></span></div>`).join("")
+      : `<div class="tp-sig">Nothing followed yet.</div>`;
+    const groups = Object.entries(L.groups||{}).filter(([,g])=>g.length).map(([name,g])=>`<div style="margin-top:4px"><b>${esc(name)}:</b> `
+      + g.map(x=>`${esc(x.key)} ${x.median_vs_usual}× (n=${x.n}${x.few?", too few":""})`).join(" · ") + `</div>`).join("");
+    $("tr-lessons").innerHTML = L.measured
+      ? `<div class="tm-advice"><b>What works for your channel</b> — pace against your own usual, videos at least 2 days old (${L.measured} measured)${groups}
+         ${L.enough?"":`<div class="tp-sig" style="margin-top:4px">Under 5 measured videos: these are anecdotes, not findings yet.</div>`}</div>` : "";
+  } catch(e) {}
+}
+$("tr-go").onclick = async ()=>{
+  const url = $("tr-url").value.trim();
+  if (!url) return;
+  $("tr-go").disabled = true; $("tr-st").textContent = "Reading the video…";
+  try { const v = await api("/api/track", {url}); $("tr-st").textContent = `Following “${v.title}”.`; $("tr-url").value = ""; loadFollowed(); }
+  catch(e) { $("tr-st").textContent = e.message; }
+  finally { $("tr-go").disabled = false; }
+};
 async function loadPosts(){
   if (VIEW !== "posts") return;
+  loadFollowed();
   try {
     const d = await (await fetch("/api/analytics")).json();
     const s = d.summary;

@@ -1236,7 +1236,7 @@ def generate(platform: str, topic: str, notes: str = "", language: str = "englis
                 "learned": learned,
                 "revised": revised, "language": language, "fields": spec["fields"]})
     try:
-        _save(platform, topic, out["strategy"].get("state"), package, plan, language, media_id)
+        out["package_id"] = _save(platform, topic, out["strategy"].get("state"), package, plan, language, media_id)
     except Exception:  # noqa: BLE001 — history is a convenience; never fail the result over it
         pass
     return out
@@ -1253,13 +1253,14 @@ def _db():
 
 
 def _save(platform: str, topic: str, trend_state: str | None, package: dict,
-          plan: dict | None = None, language: str = "", media_id: str | None = None) -> None:
+          plan: dict | None = None, language: str = "", media_id: str | None = None) -> int:
     with closing(_db()) as conn:
-        conn.execute("INSERT INTO content_packages (created_at, platform, topic, trend_state, package, plan, language,"
+        cur = conn.execute("INSERT INTO content_packages (created_at, platform, topic, trend_state, package, plan, language,"
                      " media_id) VALUES (?,?,?,?,?,?,?,?)",
                      (time.time(), platform, topic[:300], trend_state, json.dumps(package, ensure_ascii=False),
                       json.dumps(plan, ensure_ascii=False) if plan else None, language, media_id))
         conn.commit()
+        return cur.lastrowid
 
 
 def _limit_problems(package: dict, fields: dict) -> list[str]:

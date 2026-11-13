@@ -323,6 +323,28 @@ def api_media_watch():
         return jsonify({"error": f"Could not read that: {type(exc).__name__}. Try again, or upload the file."}), 500
 
 
+@app.post("/api/track")
+def api_track():
+    """Follow a video posted by hand: JSON {url, package_id?}."""
+    from engine import media, tracking
+    body = _body()
+    url, pkg = body.get("url"), body.get("package_id")
+    if not isinstance(url, str) or not url.strip():
+        return jsonify({"error": "Paste the video's link."}), 400
+    try:
+        return jsonify(tracking.track(url.strip(), pkg if isinstance(pkg, int) and not isinstance(pkg, bool) else None))
+    except media.MediaError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": f"Could not read that video: {type(exc).__name__}. Try again."}), 500
+
+
+@app.get("/api/track")
+def api_tracked():
+    from engine import tracking
+    return jsonify({"videos": tracking.followed(), "lessons": tracking.lessons()})
+
+
 @app.get("/api/content/formats")
 def api_content_formats():
     from engine import content
