@@ -99,3 +99,71 @@ def test_search_route_needs_provider_model_and_key(monkeypatch):
 def test_search_off_uses_the_free_chain_for_research_text(chain):
     chain.setattr(llm, "_compat_complete", lambda p, m, s, u: f"notes from {p}")
     assert llm.run_with_web_search("s", "u", use_search=False) == "notes from gemini"
+
+# ---------------- the model picked in the UI (force / choices / claude) -----
+
+@pytest.fixture
+def unforced():
+    yield
+    llm.force(None)
+
+
+def test_a_forced_writer_replaces_the_whole_chain(chain, unforced):
+    llm.force("claude:sonnet")
+    assert llm.writers() == [("claude", "sonnet")]
+    llm.force(None)
+    assert llm.writers()[0] == ("gemini", "flash-lite")
+
+
+def test_a_forced_writer_does_not_fall_back(chain, unforced):
+    def boom(p, m, *a, **k):
+        raise RuntimeError(f"{p} down")
+    chain.setattr(llm, "structured_on", boom)
+    llm.force("claude:opus")
+    with pytest.raises(RuntimeError, match="claude down"):
+        llm.structured("s", "u", SCHEMA)
+
+
+def test_choices_only_offer_what_this_machine_can_reach(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setattr(llm, "claude_cli", lambda: None)
+    assert [c["id"] for c in llm.choices()] == [""]
+    monkeypatch.setattr(llm, "claude_cli", lambda: r"C:\x\claude.exe")
+    monkeypatch.setenv("GEMINI_API_KEY", "g")
+    ids = [c["id"] for c in llm.choices()]
+    assert "claude:sonnet" in ids and "gemini:gemini-3.5-flash" in ids
+    assert not any(i.startswith("openai:") for i in ids)
+
+
+def test_claude_cli_structured_prefers_structured_output(monkeypatch):
+    import subprocess
+    monkeypatch.setattr(llm, "claude_cli", lambda: "claude.exe")
+
+    class R:
+        returncode = 0
+        stderr = ""
+        stdout = __import__("json").dumps({"is_error": False, "structured_output": {"a": "x"},
+                                           "result": '```json\n{"a": "from text"}\n```'})
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen["cmd"], seen["input"] = cmd, kw.get("input")
+        return R()
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    assert llm._claude_structured("sonnet", "sys", "user", SCHEMA) == {"a": "x"}
+    assert "--json-schema" in seen["cmd"] and seen["input"] == "user"
+    assert seen["cmd"][seen["cmd"].index("--model") + 1] == "sonnet"
+
+
+def test_claude_cli_errors_are_plain(monkeypatch):
+    import subprocess
+    monkeypatch.setattr(llm, "claude_cli", lambda: "claude.exe")
+
+    class R:
+        returncode = 1
+        stderr = "not logged in"
+        stdout = ""
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: R())
+    with pytest.raises(RuntimeError, match="not logged in"):
+        llm._claude_complete("haiku", "s", "u")

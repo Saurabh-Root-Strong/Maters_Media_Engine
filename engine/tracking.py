@@ -166,6 +166,7 @@ def followed(now: float | None = None) -> list[dict]:
             pkg = _package(t["package_id"])
             if pkg:
                 p = json.loads(pkg["package"])
+                row["writer"] = pkg.get("writer")
                 row["package"] = {"platform": pkg["platform"], "topic": pkg["topic"],
                                   "suggested_title": ((p.get("titles") or [{}])[0] or {}).get("text")}
             out.append(row)
@@ -199,4 +200,6 @@ def lessons(now: float | None = None) -> dict:
     group("Kind of content", lambda r: (r.get("content_type") or "").replace("_", " ") or None)
     group("Posting time (IST)", lambda r: _slot(r["posted_hour_ist"]) if r.get("posted_hour_ist") is not None else None)
     group("Format", lambda r: {"short": "Shorts", "long": "Long videos", "live": "Live"}.get(r.get("kind")))
+    # Which model's packages do better on THIS channel — the answer to "which one should I pick".
+    group("Written by", lambda r: r.get("writer"))
     return out

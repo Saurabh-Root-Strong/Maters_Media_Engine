@@ -362,8 +362,30 @@ def _system(spec: dict, language: str) -> str:
 _EMOJI = re.compile("[\U0001F300-\U0001FAFF\u2600-\u27BF\u2B50\u2B55\u2190-\u21FF\u2934\u2935]")
 
 
+# One emoji as a viewer sees it: a joined sequence (woman-in-lotus = person + ZWJ
+# + female sign) is ONE, not two. Counting code points over-counted those.
+_EMOJI_MOD = "[️\U0001F3FB-\U0001F3FF]*"
+_EMOJI_SEEN = re.compile(f"{_EMOJI.pattern}{_EMOJI_MOD}(?:‍{_EMOJI.pattern}{_EMOJI_MOD})*")
+
+
 def _emojis(text: str) -> int:
-    return len(_EMOJI.findall(text or ""))
+    return len(_EMOJI_SEEN.findall(text or ""))
+
+
+def _trim_emojis(text: str, most: int) -> str:
+    """Keep the first `most` emojis, remove the rest. Too many is a count, so
+    code fixes it instead of sending the creator a note."""
+    seen = 0
+
+    def keep(m):
+        nonlocal seen
+        seen += 1
+        return m.group(0) if seen <= most else ""
+    out = _EMOJI_SEEN.sub(keep, text or "")
+    if seen <= most:
+        return text
+    out = re.sub(r"[ \t]+([.,!?\n])", r"\1", out)
+    return re.sub(r"[ \t]{2,}", " ", out).strip()
 
 
 def _emoji_brief(rule: dict | None) -> str:
@@ -576,6 +598,9 @@ _LEVELS_FIRST = re.compile(r"₹?\s?(?<![\d.])(?!(?:19|20)\d\d\b)\d{2,}[\d,.]*\s
 _PROMISE_TAG = re.compile(r"\b(analysis|tips?|strateg(y|ies)|course|for beginners|how to|kaise|sikhe|seekhe|learn"
                           r"|tutorial|explained|intraday|day trading|swing trading|news|prediction|target|"
                           r"stocks? to buy|best stocks?)\b", re.I)
+# On a mood or humour reel a tag naming an index or "today" describes some other
+# video (a market update). YouTube treats unrelated tags as misleading metadata.
+_OFF_VIDEO_TAG = re.compile(r"\b(today|aaj|live|bank ?nifty|banknifty|nifty|sensex|options?)\b", re.I)
 _PRODUCTION_TALK = re.compile(
     r"\b(footage|atmospheric|on-?screen|voice-?over|b-?roll|handle logo|night[- ]drive"
     r"|this (reel|short|clip) (captures|shows|features|displays)"
@@ -913,7 +938,9 @@ _REVIEW_SCHEMA = {
 def judges() -> list[tuple[str, str]]:
     """Reviewers: a different, stronger model than the writer.
     MEDIA_ENGINE_JUDGES=gemini:gemini-3.5-flash,... (free Gemini by default)."""
-    raw = os.environ.get("MEDIA_ENGINE_JUDGES", "gemini:gemini-3.5-flash,gemini:gemini-flash-latest,"
+    # gemini-flash-latest was second; on the free tier it now times out or 429s
+    # (measured 14 Nov 2026), so a pinned gemini-3.5-flash writer had no reviewer.
+    raw = os.environ.get("MEDIA_ENGINE_JUDGES", "gemini:gemini-3.5-flash,gemini:gemini-3.5-flash-lite,"
                                                   "openrouter:nvidia/nemotron-3.5-super-vl:free")
     out = []
     for entry in raw.split(","):
@@ -1211,6 +1238,20 @@ def generate(platform: str, topic: str, notes: str = "", language: str = "englis
             + "\n- ".join(must),
             schema, max_tokens=3000)
         issues = check(package)
+    rule = spec.get("emojis") or {}
+    if "description" in rule and package.get("description"):
+        package["description"] = _trim_emojis(package["description"], rule["description"][1])
+    if "title" in rule:
+        for t in package.get("titles") or []:
+            if isinstance(t, dict) and t.get("text"):
+                t["text"] = _trim_emojis(t["text"], rule["title"][1])
+    # A sentence-long hashtag ("#MobileInternetAurSukoon") has no one following it:
+    # the slot is worth more on a tag people actually browse.
+    hmin = (spec["fields"].get("hashtags") or {}).get("min", 3)
+    short = [h for h in package.get("hashtags") or [] if len(str(h).lstrip("#")) <= 22]
+    if package.get("hashtags") and len(short) >= hmin:
+        package["hashtags"] = short
+    issues = check(package)
     for tag in reversed(spec.get("always_hashtags") or []):
         have = [h for h in package.get("hashtags", []) if str(h).lstrip("#").lower() != tag.lower()]
         if spec.get("brand_last"):
@@ -1218,8 +1259,37 @@ def generate(platform: str, topic: str, notes: str = "", language: str = "englis
             package["hashtags"] = have[:cap - 1] + [tag]
         else:
             package["hashtags"] = [tag] + have
-    if seen.get("content_type") in _SHARE_TYPES and package.get("tags"):
-        package["tags"] = [t for t in package["tags"] if not _PROMISE_TAG.search(str(t))]
+    # A comment that asks nothing gets no replies. If the one rewrite did not fix
+    # it, fix that single line rather than hand the creator a note to act on.
+    ask = "The pinned comment should ask"
+    if package.get("pinned_comment") and any(i.startswith(ask) for i in issues):
+        wrote = llm.last_writer          # the package's author, not this one-line edit's
+        try:
+            line = llm.complete(
+                "You edit one pinned YouTube comment for an Indian finance creator. Keep its meaning, language "
+                "and tone. End it with ONE real question a viewer can answer in a few words from their own life. "
+                "No advice, no trading levels, no 'comment below'. Reply with the comment only.",
+                package["pinned_comment"], max_tokens=200).strip().strip('"')
+            if "?" in line and len(line) <= 500:
+                trial = {**package, "pinned_comment": line}
+                after = check(trial)
+                if not any(i.startswith(ask) for i in after) and len(after) < len(issues):
+                    package, issues = trial, after
+        except Exception:  # noqa: BLE001 — the note stays; the package is still usable
+            pass
+        llm.last_writer = wrote
+    if seen.get("content_type") in _SHARE_TYPES:
+        said = f"{topic}\n{known}".lower()
+
+        def fits(tag) -> bool:
+            words = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", str(tag).lstrip("#"))   # "BankNifty" -> "Bank Nifty"
+            return not _PROMISE_TAG.search(words) and not any(
+                m.group(0).lower() not in said for m in _OFF_VIDEO_TAG.finditer(words))
+        if package.get("tags"):
+            package["tags"] = [t for t in package["tags"] if fits(t)]
+        kept = [h for h in package.get("hashtags") or [] if fits(h)]
+        if len(kept) >= (spec["fields"].get("hashtags") or {}).get("min", 3):
+            package["hashtags"] = kept
     package, limit_notes = enforce(package, spec["fields"])
     # A second, stronger model picks what to paste. It never blocks the result.
     brief = (media_mod.brief_for_writer(seen_media, owner, platform) if seen_media
@@ -1246,7 +1316,7 @@ def _db():
     conn = analytics.connect()
     conn.executescript(_SCHEMA_SQL)
     have = {r["name"] for r in conn.execute("PRAGMA table_info(content_packages)")}
-    for col in ("plan", "language", "media_id"):   # added after the first release
+    for col in ("plan", "language", "media_id", "writer"):   # added after the first release
         if col not in have:
             conn.execute(f"ALTER TABLE content_packages ADD COLUMN {col} TEXT")  # noqa: S608 — fixed names
     return conn
@@ -1256,9 +1326,10 @@ def _save(platform: str, topic: str, trend_state: str | None, package: dict,
           plan: dict | None = None, language: str = "", media_id: str | None = None) -> int:
     with closing(_db()) as conn:
         cur = conn.execute("INSERT INTO content_packages (created_at, platform, topic, trend_state, package, plan, language,"
-                     " media_id) VALUES (?,?,?,?,?,?,?,?)",
+                     " media_id, writer) VALUES (?,?,?,?,?,?,?,?,?)",
                      (time.time(), platform, topic[:300], trend_state, json.dumps(package, ensure_ascii=False),
-                      json.dumps(plan, ensure_ascii=False) if plan else None, language, media_id))
+                      json.dumps(plan, ensure_ascii=False) if plan else None, language, media_id,
+                      llm.last_writer or None))   # which model wrote it: the results loop compares them
         conn.commit()
         return cur.lastrowid
 

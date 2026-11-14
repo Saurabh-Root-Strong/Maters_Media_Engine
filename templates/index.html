@@ -328,6 +328,7 @@
         <div class="cg-plats" id="cg-plats"></div>
         <div class="cg-plat-links"><a id="cg-plat-best" style="display:none">Best for this video</a><a id="cg-plat-all">All</a><a id="cg-plat-none">Clear</a></div></div>
       <div><label>Language</label><select id="cg-lang"></select></div>
+      <div><label>Written by (model)</label><select id="cg-writer"></select></div>
       <div class="wide"><label>What is the video about? (one line — the subject, as a viewer would search it)</label>
         <input id="cg-topic" class="cg-in" placeholder='e.g. "Jio IPO shareholder quota explained"' maxlength="200"></div>
       <div class="wide"><label>What does it cover? (optional — key points, numbers, names. The package only describes what you list here.)</label>
@@ -1153,10 +1154,11 @@ async function runContent(analyseOnly){
   if (!topic) { $("cg-err").textContent = "Say what the video is about."; $("cg-err").style.display = "block"; return; }
   $("cg-analyse").disabled = $("cg-go").disabled = true;
   $("cg-status").textContent = analyseOnly ? "Looking the topic up — news, reader interest, YouTube…"
-    : "Researching the topic, planning the strategy, then writing — about 20–30 seconds…";
+    : "Researching the topic, planning the strategy, then writing — about 20–30 seconds…"
+      + ($("cg-writer").value.startsWith("claude:") ? " (Claude via your Claude Code plan can take a minute or two)" : "");
   try {
     const d = await api("/api/content", {platform:selectedPlats()[0], language:$("cg-lang").value,
-      topic, notes:$("cg-notes").value, analyse_only:analyseOnly,
+      topic, notes:$("cg-notes").value, analyse_only:analyseOnly, writer:$("cg-writer").value,
       media_id: MW ? MW.media_id : null, owner: mwOwner()});
     CG_COPY = [];
     $("cg-out").className = "cg-out" + (d.package ? "" : " single");
@@ -1176,6 +1178,10 @@ async function loadContentFormats(recentOnly){
       renderPlats();
       setPlats(saved.filter(x=>CG_PLATS.some(p=>p.id===x)).length ? saved : [CG_PLATS[0].id]);
       $("cg-lang").innerHTML = d.languages.map(l=>`<option value="${esc(l)}">${esc(l[0].toUpperCase()+l.slice(1))}</option>`).join("");
+      $("cg-writer").innerHTML = (d.writers||[]).map(w=>`<option value="${esc(w.id)}">${esc(w.label)}</option>`).join("");
+      let w = ""; try { w = localStorage.getItem("cg-writer") || ""; } catch(e) {}
+      if ([...$("cg-writer").options].some(o=>o.value===w)) $("cg-writer").value = w;
+      $("cg-writer").onchange = ()=>{ try { localStorage.setItem("cg-writer", $("cg-writer").value); } catch(e) {} };
     }
     $("cg-recent-box").style.display = d.recent.length ? "block" : "none";
     const names = Object.fromEntries(d.platforms.map(p=>[p.id, p.label]));
@@ -1198,7 +1204,7 @@ async function runMany(list){
       $("cg-status").textContent = `Writing for ${PLAT_NAME[list[i]]||list[i]} (${i+1} of ${list.length})…`;
       try {
         const d = await api("/api/content", {platform:list[i], language:$("cg-lang").value, topic, notes:$("cg-notes").value,
-          media_id: MW ? MW.media_id : null, owner: mwOwner()});
+          writer:$("cg-writer").value, media_id: MW ? MW.media_id : null, owner: mwOwner()});
         if (!evidence) evidence = evidenceHtml(d);
         parts.push(packageHtml(d));
       } catch(e) { parts.push(`<div class="cg-box"><h3>${esc(PLAT_NAME[list[i]]||list[i])}</h3><div class="tp-warn">${esc(e.message)}</div></div>`); }

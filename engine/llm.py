@@ -151,6 +151,67 @@ def _anthropic_structured(system: str, user: str, schema: dict, max_tokens: int)
     return json.loads(_anthropic_text(resp))
 
 
+# ================= Claude Code CLI (the subscription, no API key) ===========
+#
+# The creator already pays for Claude Code. Its CLI answers headless
+# (`claude -p`) using that subscription's sign-in, so the "claude" writer
+# needs no ANTHROPIC_API_KEY. Tools and project settings are switched off:
+# it is a plain model call, not an agent run.
+
+_CLAUDE_MODELS = [("sonnet", "best balance"), ("opus", "strongest, slowest"), ("haiku", "fastest")]
+# Default effort took ~115s a call on Sonnet (measured); a title-and-tags package
+# does not need that much thinking. MEDIA_ENGINE_CLAUDE_EFFORT=medium|high to raise it.
+_CLAUDE_EFFORT = os.environ.get("MEDIA_ENGINE_CLAUDE_EFFORT", "low").strip().lower()
+_claude_bin: str | None | bool = False       # False = not looked up yet
+
+
+def claude_cli() -> str | None:
+    """Path to the Claude Code executable, or None when it is not installed."""
+    global _claude_bin
+    if _claude_bin is False:
+        import shutil
+        p = os.environ.get("MEDIA_ENGINE_CLAUDE_BIN") or shutil.which("claude")
+        if p and p.lower().endswith((".ps1", ".cmd", ".bat")):
+            # npm shims re-quote arguments through cmd/pwsh and mangle JSON —
+            # call the real executable next to them instead.
+            exe = os.path.join(os.path.dirname(p), "node_modules", "@anthropic-ai",
+                               "claude-code", "bin", "claude.exe")
+            p = exe if os.path.exists(exe) else None
+        _claude_bin = p
+    return _claude_bin
+
+
+def _claude_run(model: str, system: str, user: str, extra: list[str]) -> dict:
+    import subprocess
+    cmd = [claude_cli(), "-p", "--model", model, "--system-prompt", system,
+           "--tools", "", "--setting-sources", "", "--no-session-persistence",
+           "--output-format", "json", *extra]
+    if _CLAUDE_EFFORT in ("low", "medium", "high"):
+        cmd += ["--effort", _CLAUDE_EFFORT]
+    r = subprocess.run(cmd, input=user, capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", timeout=300)
+    if r.returncode != 0 and not (r.stdout or "").lstrip().startswith("{"):
+        raise RuntimeError(f"claude CLI exit {r.returncode}: {(r.stderr or r.stdout)[:200]}")
+    out = json.loads(r.stdout)
+    if out.get("is_error") or r.returncode != 0:
+        # e.g. the plan's usage limit: the CLI says when it resets — pass that on.
+        raise RuntimeError(f"Claude Code: {str(out.get('result') or r.stderr)[:240]}")
+    return out
+
+
+def _claude_structured(model: str, system: str, user: str, schema: dict) -> dict:
+    out = _claude_run(model, system, user, ["--json-schema", json.dumps(schema)])
+    data = out.get("structured_output")
+    return data if isinstance(data, dict) else _parse_json(out.get("result", ""), schema)
+
+
+def _claude_complete(model: str, system: str, user: str) -> str:
+    text = (_claude_run(model, system, user, []).get("result") or "").strip()
+    if not text:
+        raise RuntimeError("claude CLI returned no text")
+    return text
+
+
 # ===================== writers: any OpenAI-compatible API ====================
 #
 # Most providers speak the OpenAI chat-completions format, so one code path
@@ -175,10 +236,44 @@ COMPAT = {
 _compat_clients: dict[str, object] = {}
 last_writer = ""        # "provider:model" that answered the most recent writing call
 last_errors: list[str] = []   # why earlier entries in the chain were skipped
+import contextvars  # noqa: E402
+# The model picked in the UI for this run. Per request/thread: a plain global
+# would also pin (and remove the fallback of) any other request in flight.
+_forced: contextvars.ContextVar = contextvars.ContextVar("media_engine_writer", default=None)
+
+
+def force(writer: str | None) -> None:
+    """Pin every writing call of this run to one 'provider:model' (None resets).
+
+    A pinned run does NOT fall back: the person chose that model, so a quiet
+    swap to another one would misreport who wrote the package."""
+    if not writer:
+        _forced.set(None)
+        return
+    prov, _, model = writer.partition(":")
+    _forced.set((prov.strip().lower(), model.strip()))
+
+
+def choices() -> list[dict]:
+    """Models the UI can offer, only those this machine can actually reach."""
+    out = [{"id": "", "label": "Auto — free Gemini first, falls back down the chain"}]
+    if claude_cli():
+        out += [{"id": f"claude:{m}", "label": f"Claude {m.capitalize()} — {note}, your Claude Code plan"}
+                for m, note in _CLAUDE_MODELS]
+    if os.environ.get("GEMINI_API_KEY"):
+        out += [{"id": f"gemini:{m}", "label": f"Gemini {m.split('gemini-')[-1]} — free tier"}
+                for m in ("gemini-3.5-flash", "gemini-3.5-flash-lite")]
+    if os.environ.get("OPENAI_API_KEY"):
+        out += [{"id": f"openai:{m}", "label": f"OpenAI {m} — paid key"}
+                for m in ("gpt-5.2", "gpt-5-mini", _OPENAI_MODEL)]
+    seen: set[str] = set()
+    return [c for c in out if not (c["id"] in seen or seen.add(c["id"]))]
 
 
 def writers() -> list[tuple[str, str]]:
     """The fallback chain as [(provider, model)], entries without a key dropped."""
+    if _forced.get():
+        return [_forced.get()]
     out = []
     for entry in os.environ.get("MEDIA_ENGINE_WRITERS", "").split(","):
         prov, _, model = entry.strip().partition(":")
@@ -246,6 +341,8 @@ def _compat_structured(provider: str, model: str, system: str, user: str, schema
         status = getattr(exc, "status_code", None)
         if status in (401, 403, 429) or (status and status >= 500):
             raise
+        if type(exc).__name__ in ("APITimeoutError", "APIConnectionError"):
+            raise           # retrying a dead line doubled the wait to 90s (measured)
         messages[0]["content"] = (system + "\n\nReply with ONE JSON object and nothing else, "
                                   "matching this JSON Schema exactly:\n" + json.dumps(schema))
         resp = client.chat.completions.create(model=model, messages=messages,
@@ -274,6 +371,8 @@ def structured_on(provider: str, model: str, system: str, user: str, schema: dic
     """One structured call on one named writer (no fallback)."""
     if provider == "anthropic":
         return _anthropic_structured(system, user, schema, max_tokens)
+    if provider == "claude":
+        return _claude_structured(model, system, user, schema)
     return _compat_structured(provider, model, system, user, schema)
 
 
@@ -346,6 +445,7 @@ def run_with_web_search(system: str, user: str, use_search: bool | None = None) 
                 raise
     if not flag and writers():
         return _chain(lambda p, m: _anthropic_web(system, user, False) if p == "anthropic"
+                      else _claude_complete(m, system, user) if p == "claude"
                       else _compat_complete(p, m, system, user))
     if PROVIDER == "openai":
         return _openai_web(system, user, flag)
@@ -366,6 +466,7 @@ def complete(system: str, user: str, max_tokens: int = 1500) -> str:
         return _chain(lambda p, m: _anthropic_text(_anthropic().messages.create(
             model=m, max_tokens=max_tokens, system=system,
             messages=[{"role": "user", "content": user}])) if p == "anthropic"
+            else _claude_complete(m, system, user) if p == "claude"
             else _compat_complete(p, m, system, user))
     if PROVIDER == "openai":
         r = _openai().chat.completions.create(

@@ -349,7 +349,7 @@ def api_tracked():
 def api_content_formats():
     from engine import content
     return jsonify({"platforms": content.platforms(), "languages": content.languages(),
-                    "recent": content.recent()})
+                    "writers": llm.choices(), "recent": content.recent()})
 
 
 @app.post("/api/content")
@@ -385,7 +385,15 @@ def api_content():
                                      "“Analyse trends” works without it."}), 400
         owner = "theirs" if body.get("owner") == "theirs" else "mine"
         media_id = body.get("media_id") if isinstance(body.get("media_id"), str) else None
-        out = content.generate(platform, topic, notes, language, board, media_id=media_id, owner=owner)
+        writer = body.get("writer")
+        if writer and writer not in {c["id"] for c in llm.choices()}:
+            return jsonify({"error": "That model is not available on this machine."}), 400
+        llm.force(writer)
+        try:
+            out = content.generate(platform, topic, notes, language, board,
+                                   media_id=media_id, owner=owner)
+        finally:
+            llm.force(None)
         return jsonify({**out, "writer": llm.last_writer, "writer_skipped": llm.last_errors})
     except Exception as exc:  # noqa: BLE001
         return jsonify({"error": f"Content generator failed: {exc}"}), 500
