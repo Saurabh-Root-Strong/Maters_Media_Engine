@@ -158,7 +158,10 @@ def _anthropic_structured(system: str, user: str, schema: dict, max_tokens: int)
 # needs no ANTHROPIC_API_KEY. Tools and project settings are switched off:
 # it is a plain model call, not an agent run.
 
-_CLAUDE_MODELS = [("sonnet", "best balance"), ("opus", "strongest, slowest"), ("haiku", "fastest")]
+# Haiku was offered as "fastest" and was neither: 233-238s a package through the
+# CLI (Sonnet 64-79s) and it drifted into Devanagari on Hinglish (audit 14 Nov).
+# Auto is free and faster for a quick draft, so Haiku is not offered.
+_CLAUDE_MODELS = [("sonnet", "best balance"), ("opus", "strongest, slowest")]
 # Default effort took ~115s a call on Sonnet (measured); a title-and-tags package
 # does not need that much thinking. MEDIA_ENGINE_CLAUDE_EFFORT=medium|high to raise it.
 _CLAUDE_EFFORT = os.environ.get("MEDIA_ENGINE_CLAUDE_EFFORT", "low").strip().lower()
@@ -181,28 +184,86 @@ def claude_cli() -> str | None:
     return _claude_bin
 
 
-def _claude_run(model: str, system: str, user: str, extra: list[str]) -> dict:
+_CLAUDE_TIMEOUT = 300       # seconds for one call; a package is 2-4 calls of 15-60s each
+
+
+def _run_bounded(cmd: list[str], text_in: str, limit: float):
+    """subprocess.run with a limit that really ends the call.
+
+    Plain `subprocess.run(timeout=...)` kills only the process it started. The
+    CLI's own child processes keep the output pipes open, so on Windows the
+    call never returned: one stuck request (the laptop slept mid-call) sat for
+    hours, holding the dashboard's request with it. Kill the whole tree."""
     import subprocess
+    p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                         text=True, encoding="utf-8", errors="replace")
+    try:
+        out, err = p.communicate(text_in, timeout=limit)
+    except subprocess.TimeoutExpired:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/PID", str(p.pid), "/T", "/F"], capture_output=True, check=False)
+        else:
+            p.kill()
+        try:
+            p.communicate(timeout=10)
+        except Exception:  # noqa: BLE001 — the pipes may never close; do not wait on them again
+            pass
+        raise RuntimeError(f"Claude Code did not answer within {int(limit)} seconds and was stopped. "
+                           "Try again, or pick another model.") from None
+    return subprocess.CompletedProcess(cmd, p.returncode, out, err)
+
+
+def _claude_run(model: str, system: str, user: str, extra: list[str]) -> dict:
     cmd = [claude_cli(), "-p", "--model", model, "--system-prompt", system,
            "--tools", "", "--setting-sources", "", "--no-session-persistence",
            "--output-format", "json", *extra]
     if _CLAUDE_EFFORT in ("low", "medium", "high"):
         cmd += ["--effort", _CLAUDE_EFFORT]
-    r = subprocess.run(cmd, input=user, capture_output=True, text=True,
-                       encoding="utf-8", errors="replace", timeout=300)
+    r = _run_bounded(cmd, user, _CLAUDE_TIMEOUT)
     if r.returncode != 0 and not (r.stdout or "").lstrip().startswith("{"):
         raise RuntimeError(f"claude CLI exit {r.returncode}: {(r.stderr or r.stdout)[:200]}")
     out = json.loads(r.stdout)
     if out.get("is_error") or r.returncode != 0:
         # e.g. the plan's usage limit: the CLI says when it resets — pass that on.
-        raise RuntimeError(f"Claude Code: {str(out.get('result') or r.stderr)[:240]}")
+        # Some failures carry no `result` at all (only a subtype and an `errors`
+        # list): reporting just `result` showed the creator "Claude Code:" and nothing.
+        errs = out.get("errors")
+        why = " | ".join(str(x) for x in (
+            out.get("result"), "; ".join(map(str, errs)) if isinstance(errs, list) else errs,
+            out.get("subtype") if out.get("subtype") != "success" else None,
+            f"API status {out['api_error_status']}" if out.get("api_error_status") else None,
+            (r.stderr or "").strip()) if x)
+        raise RuntimeError(f"Claude Code: {(why or f'failed with no reason given (exit {r.returncode})')[:300]}")
+    # "opus" is an alias: record the model that really answered, so the page
+    # can show it and a silent downgrade on the plan would be visible.
+    used = out.get("modelUsage") or {}
+    _state.last_model = max(used, key=lambda k: (used[k] or {}).get("outputTokens", 0)) if used else ""
     return out
 
 
+# Not worth a second try: the plan is out of usage, or nobody is signed in.
+_CLAUDE_FINAL = ("limit", "log in", "login", "logged", "auth", "credit", "subscription", "billing",
+                 "did not answer")   # a 5-minute hang is not worth a second 5 minutes
+
+
 def _claude_structured(model: str, system: str, user: str, schema: dict) -> dict:
-    out = _claude_run(model, system, user, ["--json-schema", json.dumps(schema)])
-    data = out.get("structured_output")
-    return data if isinstance(data, dict) else _parse_json(out.get("result", ""), schema)
+    try:
+        out = _claude_run(model, system, user, ["--json-schema", json.dumps(schema)])
+        data = out.get("structured_output")
+        return data if isinstance(data, dict) else _parse_json(out.get("result", ""), schema)
+    except Exception as exc:  # noqa: BLE001
+        if any(w in str(exc).lower() for w in _CLAUDE_FINAL):
+            raise
+        first = str(exc)
+    # Second way in: the CLI's schema mode can give up (its own retry cap, or a
+    # reply it could not validate) with no reason. Ask for the JSON as plain text
+    # and check it here instead — a pinned model has no other writer to fall to.
+    try:
+        out = _claude_run(model, system + "\n\nReply with ONE JSON object and nothing else — no prose, no code "
+                          "fence — matching this JSON Schema exactly:\n" + json.dumps(schema), user, [])
+        return _parse_json(out.get("result", ""), schema)
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(f"{first} | second attempt: {str(exc)[:160]}") from None
 
 
 def _claude_complete(model: str, system: str, user: str) -> str:
@@ -234,8 +295,6 @@ COMPAT = {
     "mistral":    {"base": "https://api.mistral.ai/v1", "key": "MISTRAL_API_KEY"},
 }
 _compat_clients: dict[str, object] = {}
-last_writer = ""        # "provider:model" that answered the most recent writing call
-last_errors: list[str] = []   # why earlier entries in the chain were skipped
 import contextvars  # noqa: E402
 # The model picked in the UI for this run. Per request/thread: a plain global
 # would also pin (and remove the fallback of) any other request in flight.
@@ -351,13 +410,22 @@ def _compat_structured(provider: str, model: str, system: str, user: str, schema
     if not content:
         refusal = getattr(resp.choices[0].message, "refusal", None)
         raise RuntimeError(f"Model returned no structured output: {refusal or 'empty response'}")
+    _served(resp)
     return _parse_json(content, schema)
+
+
+def _served(resp) -> None:
+    """Remember the model id the provider says answered (an alias such as
+    'gemini-flash-latest' or 'gpt-5.2' resolves to a dated model)."""
+    name = getattr(resp, "model", "")
+    _state.last_model = name.split("/")[-1] if isinstance(name, str) else ""
 
 
 def _compat_complete(provider: str, model: str, system: str, user: str) -> str:
     r = _compat(provider).chat.completions.create(
         model=model, messages=[{"role": "system", "content": system},
                                {"role": "user", "content": user}])
+    _served(r)
     text = (r.choices[0].message.content or "").strip()
     if not text:
         # e.g. finish_reason "MALFORMED_FUNCTION_CALL": the prompt made the
@@ -378,7 +446,6 @@ def structured_on(provider: str, model: str, system: str, user: str, schema: dic
 
 def _chain(call) -> object:
     """Run `call(provider, model)` down the writer chain; first success wins."""
-    global last_writer, last_errors
     errors: list[str] = []
     for provider, model in writers():
         try:
@@ -386,9 +453,9 @@ def _chain(call) -> object:
         except Exception as exc:  # noqa: BLE001 — any failure means "try the next writer"
             errors.append(f"{provider}:{model} — {type(exc).__name__}: {str(exc)[:160]}")
             continue
-        last_writer, last_errors = f"{provider}:{model}", errors
+        _state.last_writer, _state.last_errors = f"{provider}:{model}", errors
         return result
-    last_errors = errors
+    _state.last_errors = errors
     raise RuntimeError("every writer failed — " + " | ".join(errors))
 
 
@@ -480,3 +547,36 @@ def complete(system: str, user: str, max_tokens: int = 1500) -> str:
         messages=[{"role": "user", "content": user}],
     )
     return _anthropic_text(r)
+
+
+# --- who answered: per thread ------------------------------------------------
+#
+# The dashboard serves each request on its own thread. As plain module globals,
+# two packages written at once (two tabs) overwrote each other's "written by"
+# label, and the reviewer could skip the wrong model as "the writer".
+# `llm.last_writer` etc. keep working everywhere, but each thread sees its own.
+
+import sys as _sys  # noqa: E402
+import threading as _threading  # noqa: E402
+import types as _types  # noqa: E402
+
+_state = _threading.local()
+_DEFAULTS = {"last_writer": "", "last_errors": [], "last_model": ""}
+
+
+def _per_thread(name):
+    def get(_mod):
+        return getattr(_state, name, list(_DEFAULTS[name]) if isinstance(_DEFAULTS[name], list) else _DEFAULTS[name])
+
+    def put(_mod, value):
+        setattr(_state, name, value)
+    return property(get, put)
+
+
+class _LLMModule(_types.ModuleType):
+    last_writer = _per_thread("last_writer")       # "provider:model" that answered the latest writing call
+    last_errors = _per_thread("last_errors")       # why earlier entries in the chain were skipped
+    last_model = _per_thread("last_model")         # exact model id the provider reported
+
+
+_sys.modules[__name__].__class__ = _LLMModule

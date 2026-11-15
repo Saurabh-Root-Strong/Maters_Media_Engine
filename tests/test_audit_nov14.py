@@ -65,14 +65,14 @@ def test_claude_cli_passes_low_effort_and_reports_limits_plainly(monkeypatch):
     def run(cmd, **kw):
         seen["cmd"] = cmd
         return Ok()
-    monkeypatch.setattr(subprocess, "run", run)
+    monkeypatch.setattr(llm, "_run_bounded", lambda cmd, text, limit, _f=run: _f(cmd, input=text))
     assert llm._claude_complete("sonnet", "s", "u") == "hello"
     assert seen["cmd"][seen["cmd"].index("--effort") + 1] == "low"
 
     class Limit:
         returncode, stderr = 1, ""
         stdout = json.dumps({"is_error": True, "result": "Usage limit reached. Resets at 3pm."})
-    monkeypatch.setattr(subprocess, "run", lambda *a, **k: Limit())
+    monkeypatch.setattr(llm, "_run_bounded", lambda cmd, text, limit, _f=lambda *a, **k: Limit(): _f(cmd, input=text))
     with pytest.raises(RuntimeError, match="Resets at 3pm"):
         llm._claude_complete("sonnet", "s", "u")
 

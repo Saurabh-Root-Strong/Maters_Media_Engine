@@ -389,12 +389,15 @@ def api_content():
         if writer and writer not in {c["id"] for c in llm.choices()}:
             return jsonify({"error": "That model is not available on this machine."}), 400
         llm.force(writer)
+        llm.last_model, llm.last_writer, llm.last_errors = "", "", []   # per thread; start clean
         try:
             out = content.generate(platform, topic, notes, language, board,
                                    media_id=media_id, owner=owner)
         finally:
             llm.force(None)
-        return jsonify({**out, "writer": llm.last_writer, "writer_skipped": llm.last_errors})
+        # generate() notes who wrote the package before the reviewer runs
+        return jsonify({**out, "writer": out.get("writer") or llm.last_writer,
+                        "writer_skipped": llm.last_errors, "writer_asked": writer or ""})
     except Exception as exc:  # noqa: BLE001
         return jsonify({"error": f"Content generator failed: {exc}"}), 500
 

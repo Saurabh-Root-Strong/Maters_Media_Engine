@@ -686,6 +686,15 @@ def lint(package: dict, topic: str, notes: str, evidence: dict | None = None,
             issues.append(f"Write the name properly everywhere — “{proper}”, not “{low}” — even inside a search phrase.")
             break
 
+    # Hinglish viewers read and search in Roman letters. Claude Haiku wrote the
+    # description and pinned comment half in Devanagari (audit 14 Nov). Tags may
+    # carry Hindi spellings on purpose — they are not in text_fields.
+    if language == "hinglish":
+        deva = [t for t in text_fields if t and len(re.findall(r"[ऀ-ॿ]", t)) >= 3]
+        if deva:
+            issues.append("This is a Hinglish package: write every title, the description and the pinned comment in "
+                          "Roman letters (\"paisa kamao\", not Devanagari). Hindi spellings belong only in the tags.")
+
     # A search phrase in another language promises the wrong video
     # ("…explained in Hindi" on an English video).
     other = _OTHER_LANGUAGE.get(language)
@@ -1262,8 +1271,10 @@ def generate(platform: str, topic: str, notes: str = "", language: str = "englis
     # A comment that asks nothing gets no replies. If the one rewrite did not fix
     # it, fix that single line rather than hand the creator a note to act on.
     ask = "The pinned comment should ask"
+    # Who wrote the package, taken NOW: the one-line edit below and the reviewer
+    # after it are other calls (often other models) and would overwrite it.
+    wrote, wrote_model = llm.last_writer, llm.last_model
     if package.get("pinned_comment") and any(i.startswith(ask) for i in issues):
-        wrote = llm.last_writer          # the package's author, not this one-line edit's
         try:
             line = llm.complete(
                 "You edit one pinned YouTube comment for an Indian finance creator. Keep its meaning, language "
@@ -1298,6 +1309,8 @@ def generate(platform: str, topic: str, notes: str = "", language: str = "englis
         rv = review(package, spec, platform, brief, known, seen.get("content_type") in _SHARE_TYPES)
     except Exception as exc:  # noqa: BLE001
         rv = {"by": None, "errors": [type(exc).__name__]}
+    llm.last_writer = wrote
+    out.update({"writer": wrote, "writer_model": wrote_model})
     out.update({"review": rv, "ready": ready_to_post(package, spec, rv, out["evidence"].get("content_type")),
                 "ready_warnings": [i for i in issues if "trading levels" in i]})
     out.update({"package": package, "limit_notes": limit_notes, "quality_notes": issues, "plan": plan,

@@ -150,7 +150,7 @@ def test_claude_cli_structured_prefers_structured_output(monkeypatch):
     def fake_run(cmd, **kw):
         seen["cmd"], seen["input"] = cmd, kw.get("input")
         return R()
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(llm, "_run_bounded", lambda cmd, text, limit, _f=fake_run: _f(cmd, input=text))
     assert llm._claude_structured("sonnet", "sys", "user", SCHEMA) == {"a": "x"}
     assert "--json-schema" in seen["cmd"] and seen["input"] == "user"
     assert seen["cmd"][seen["cmd"].index("--model") + 1] == "sonnet"
@@ -164,6 +164,6 @@ def test_claude_cli_errors_are_plain(monkeypatch):
         returncode = 1
         stderr = "not logged in"
         stdout = ""
-    monkeypatch.setattr(subprocess, "run", lambda *a, **k: R())
+    monkeypatch.setattr(llm, "_run_bounded", lambda cmd, text, limit, _f=lambda *a, **k: R(): _f(cmd, input=text))
     with pytest.raises(RuntimeError, match="not logged in"):
         llm._claude_complete("haiku", "s", "u")
