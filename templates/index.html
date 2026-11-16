@@ -933,6 +933,7 @@ function mwRender(){
 }
 // --- which platforms to write for: tick-boxes, the video's best ones pre-ticked ---
 let CG_PLATS = [];                              // [{id, label}] from /api/content/formats
+let CG_LANG_DEF = {}, CG_AUD_SET = false;
 function bestPlats(){ return MW && MW.seen ? (MW.seen.best_platforms||[]).filter(x=>CG_PLATS.some(p=>p.id===x)) : []; }
 function selectedPlats(){ return [...document.querySelectorAll('#cg-plats input:checked')].map(i=>i.value); }
 function setPlats(list){
@@ -958,6 +959,15 @@ function platsChanged(){
     : (sel.length === 1 ? `Suggest for ${names[0]}` : `Suggest for ${sel.length}: ${names.join(", ")}`) + by;
   $("cg-go").disabled = !sel.length;
   $("cg-analyse").disabled = !sel.length;
+  const ao = $("cg-lang").querySelector('option[value="auto"]');
+  if (ao) {
+    // Shorts + LinkedIn ticked together can mean two languages: name each one then.
+    const L = p=>{ const l = CG_LANG_DEF[p]||"english"; return l[0].toUpperCase()+l.slice(1); };
+    const langs = [...new Set(sel.map(L))];
+    const what = !sel.length ? "pick a platform" : langs.length === 1 ? langs[0]
+      : sel.map(p=>`${PLAT_NAME[p]||p}: ${L(p)}`).join(", ");
+    ao.textContent = CG_AUD_SET ? `Your audience's (${what})` : "Auto (English)";
+  }
   try { localStorage.setItem("cg-plats", JSON.stringify(sel)); } catch(e) {}
 }
 function mwFill(r){
@@ -965,7 +975,8 @@ function mwFill(r){
   const theirs = mwOwner()==="theirs";
   if (r.topic) $("cg-topic").value = r.topic;
   $("cg-notes").value = theirs ? "" : (r.notes || "");
-  if ([...$("cg-lang").options].some(o=>o.value===r.language)) $("cg-lang").value = r.language;
+  // The language follows the AUDIENCE ("auto"), not the text in the video: an English quote reel
+  // for a Hinglish channel used to get English copy and almost no views.
   mwRender();
   renderPlats();
   const best = bestPlats();
@@ -1099,8 +1110,10 @@ function planHtml(pl){
 // On Shorts and Reels, whether people keep watching decides reach far more than
 // any title. What the watched video itself should change comes first.
 function fixFirstHtml(d){
-  if (!d.media_used || d.owner === "theirs" || !MW || !MW.seen) return "";
-  const s = MW.seen, items = [];
+  const items = (d.video_notes||[]).map(esc);
+  if (!d.media_used || d.owner === "theirs" || !MW || !MW.seen) return items.length
+    ? `<div class="tp-warn" style="margin:8px 0 12px"><b>Before posting — change these in the video:</b><br>• ${items.join("<br>• ")}</div>` : "";
+  const s = MW.seen;
   for (const e of s.text_errors||[]) items.push(`On-screen text: <b>${esc(e)}</b> — text in the video cannot be fixed after posting.`);
   if (s.hook_rating != null && s.hook_rating <= 3 && s.hook_fix) items.push(`First 2 seconds (hook ${s.hook_rating}/5): ${esc(s.hook_fix)}`);
   if ((s.retention_risks||[]).length) items.push(`Where viewers may leave: ${esc(s.retention_risks[0])}`);
@@ -1133,6 +1146,8 @@ function readyHtml(d){
   const all = r.filter(x=>!x.note || x.setting).map(x=>`${x.label.toUpperCase()}\n${x.text}`).join("\n\n");
   let h = fixFirstHtml(d) + `<div class="cg-ready"><h4>Ready to post ${copyBtn(all, "copy everything", "all")}</h4>`;
   for (const w of d.ready_warnings||[]) h += `<div class="banner err" style="display:block;margin:6px 0">⚠ Edit before posting: ${esc(w)}</div>`;
+  for (const w of d.copy_notes||[]) h += `<div class="banner err" style="display:block;margin:6px 0">⚠ Language: ${esc(w)}</div>`;
+  for (const w of d.posting_notes||[]) h += `<div class="tp-warn" style="margin:6px 0">🕒 When to post: ${esc(w)}</div>`;
   h += writerBadge(d);
   if (rv && rv.by) h += `<div class="tp-sig">Picked by a second model that did not write it (<b>${esc(rv.by.split(":").pop())}</b>) · <b>${rv.score}/10</b> · ${esc(rv.reason||"")}${(rv.changed||[]).length?` · it rewrote the ${rv.changed.map(esc).join(", ")}`:""}</div>`;
   else h += `<div class="tp-sig">No second model was available${rv&&(rv.errors||[]).length?` (${rv.errors.map(esc).join(", ")})`:""}, so the first option of each kind is shown.</div>`;
@@ -1206,7 +1221,10 @@ async function loadContentFormats(recentOnly){
       try { saved = JSON.parse(localStorage.getItem("cg-plats") || "[]"); } catch(e) {}
       renderPlats();
       setPlats(saved.filter(x=>CG_PLATS.some(p=>p.id===x)).length ? saved : [CG_PLATS[0].id]);
-      $("cg-lang").innerHTML = d.languages.map(l=>`<option value="${esc(l)}">${esc(l[0].toUpperCase()+l.slice(1))}</option>`).join("");
+      CG_LANG_DEF = d.language_defaults || {}; CG_AUD_SET = !!d.audience_set;
+      $("cg-lang").innerHTML = `<option value="auto">Your audience's</option>`
+        + d.languages.map(l=>`<option value="${esc(l)}">${esc(l[0].toUpperCase()+l.slice(1))}</option>`).join("");
+      $("cg-lang").onchange = ()=>$("cg-lang").blur();
       $("cg-writer").innerHTML = (d.writers||[]).map(w=>`<option value="${esc(w.id)}">${esc(w.label)}</option>`).join("");
       let w = ""; try { w = localStorage.getItem("cg-writer") || ""; } catch(e) {}
       if ([...$("cg-writer").options].some(o=>o.value===w)) $("cg-writer").value = w;
@@ -1440,8 +1458,11 @@ async function loadFollowed(){
       <span><a href="${esc(v.url)}" target="_blank" rel="noopener" style="color:inherit">${esc(v.title||v.video_id)}</a><br>
       <span class="tp-sig">${v.kind==="short"?"Short":v.kind||""} · ${v.age_days} days old · ${(v.views_per_hour||0).toLocaleString()} views/h ${vs(v.vs_usual)}
       ${v.like_rate!=null?` · ${(v.like_rate*100).toFixed(1)}% liked`:""} · ${v.comments??0} comments${v.content_type?` · ${esc(v.content_type.replace("_"," "))}`:""}
-      ${v.posted_hour_ist!=null?` · posted ${v.posted_hour_ist}:00 IST`:""}${v.package?` · package: ${esc(v.package.topic)}`:""}</span></span></div>`).join("")
+      ${v.posted_hour_ist!=null?` · posted ${v.posted_hour_ist}:00 IST`:""}${v.package?` · package: ${esc(v.package.topic)}`:""}${v.language?` · copy ${esc(v.language)}`:""}${v.text_language?` · video text ${esc(v.text_language)}`:""}</span></span></div>`).join("")
       : `<div class="tp-sig">Nothing followed yet.</div>`;
+    $("tr-list").insertAdjacentHTML("afterbegin", !d.channel_known
+      ? `<div class="tp-sig" style="margin-bottom:6px">Follow one of your own videos once: after that every new upload on that channel is followed automatically.</div>`
+      : `<div class="tp-sig" style="margin-bottom:6px">New uploads on your channel are followed automatically (checked every 6 hours)${d.discovered?` — ${d.discovered} just added`:""}.</div>`);
     const groups = Object.entries(L.groups||{}).filter(([,g])=>g.length).map(([name,g])=>`<div style="margin-top:4px"><b>${esc(name)}:</b> `
       + g.map(x=>`${esc(x.key)} ${x.median_vs_usual}× (n=${x.n}${x.few?", too few":""})`).join(" · ") + `</div>`).join("");
     $("tr-lessons").innerHTML = L.measured

@@ -229,6 +229,16 @@ def youtube_facts(link: dict, fetch=None) -> dict:
     }
 
 
+# Views a video gathers in this window are its "pace". Shorts get nearly all their views in
+# the first ~3 days, long videos in the first week; dividing a 200-day-old Short's views by
+# 4,800 hours made every new Short look thousands of times better than "usual".
+PACE_HOURS = {"short": 72, "long": 168, "live": 168}
+
+
+def pace_hours(kind: str | None, age_hours: float) -> float:
+    return min(max(age_hours, 1.0), PACE_HOURS.get(kind or "", 168))
+
+
 def performance(facts: dict, video_id: str, fetch=None, now: float | None = None) -> dict | None:
     """Is this video beating its own channel's usual pace (same kind of video)?"""
     key = os.environ.get("YOUTUBE_API_KEY", "").strip()
@@ -240,7 +250,7 @@ def performance(facts: dict, video_id: str, fetch=None, now: float | None = None
         recs = sources.fetch_youtube_api(facts["channel_id"], key, facts.get("channel", ""), get)
     except Exception:  # noqa: BLE001 — a nice-to-have on top of the analysis
         return None
-    rates = sorted(r["value"] / max((now - r["published_at"]) / 3600, 1.0) for r in recs
+    rates = sorted(r["value"] / pace_hours(r.get("kind"), (now - r["published_at"]) / 3600) for r in recs
                    if r["ext_id"] != video_id and r.get("value") is not None and r.get("published_at")
                    and r.get("kind") == facts.get("kind"))
     age = max((now - facts["published_at"]) / 3600, 1.0)
@@ -249,7 +259,9 @@ def performance(facts: dict, video_id: str, fetch=None, now: float | None = None
            "comment_rate": round(facts["comments"] / facts["views"], 5) if facts.get("comments") is not None and facts["views"] else None}
     if len(rates) >= 4:                    # fewer than this is not a "usual"
         usual = rates[len(rates) // 2]
-        out.update(channel_usual=round(usual), vs_usual=round((facts["views"] / age) / usual, 1) if usual else None,
+        # 3 significant figures under 10/h: a small channel's older Shorts run at a few views a
+        # month (0.005/h), and round() made that 0, which switched "vs your usual" and every lesson off.
+        out.update(channel_usual=float(f"{usual:.3g}") if usual < 10 else round(usual), vs_usual=round((facts["views"] / pace_hours(facts.get("kind"), age)) / usual, 1) if usual else None,
                    compared_with=len(rates))
     return out
 

@@ -342,13 +342,18 @@ def api_track():
 @app.get("/api/track")
 def api_tracked():
     from engine import tracking
-    return jsonify({"videos": tracking.followed(), "lessons": tracking.lessons()})
+    added = tracking.discover()       # your new uploads, at most once every few hours; never raises
+    return jsonify({"videos": tracking.followed(), "lessons": tracking.lessons(),
+                    "discovered": added, "channel_known": bool(tracking.own_channel())})
 
 
 @app.get("/api/content/formats")
 def api_content_formats():
-    from engine import content
-    return jsonify({"platforms": content.platforms(), "languages": content.languages(),
+    from engine import audience, content
+    plats = content.platforms()
+    return jsonify({"platforms": plats, "languages": content.languages(),
+                    "language_defaults": audience.defaults([p["id"] for p in plats]),
+                    "audience_set": audience.configured(),
                     "writers": llm.choices(), "recent": content.recent()})
 
 
@@ -356,16 +361,20 @@ def api_content_formats():
 def api_content():
     """Content generator. analyse_only=true returns the trend evidence without
     an LLM call (free); otherwise it also writes the package."""
-    from engine import content
+    from engine import audience, content
     body = _body()
     platform = body.get("platform")
     raw_topic = body.get("topic")
     topic = " ".join(raw_topic.split()) if isinstance(raw_topic, str) else ""
     notes = body.get("notes") if isinstance(body.get("notes"), str) else ""
     notes = notes[:4000]
-    language = body.get("language") if body.get("language") in content.languages() else "english"
     if not isinstance(platform, str) or platform not in {p["id"] for p in content.platforms()}:
         return jsonify({"error": "Pick a platform."}), 400
+    # "auto" (or nothing) = the language this channel's audience reads on this platform
+    picked = body.get("language") if body.get("language") in content.languages() else None
+    language = picked or audience.default_language(platform)
+    if language not in content.languages():
+        language = "english"
     if sum(ch.isalnum() for ch in topic) < 3:
         return jsonify({"error": "Say what the video is about — a few words naming the subject."}), 400
     if len(topic) > 200:
@@ -396,8 +405,14 @@ def api_content():
         finally:
             llm.force(None)
         # generate() notes who wrote the package before the reviewer runs
+        from engine import media
+        seen = ((media.load(media_id) or {}).get("seen") or {}) if media_id else {}
+        aud = audience.notes(platform, language, seen, owner)
         return jsonify({**out, "writer": out.get("writer") or llm.last_writer,
-                        "writer_skipped": llm.last_errors, "writer_asked": writer or ""})
+                        "writer_skipped": llm.last_errors, "writer_asked": writer or "",
+                        "language": language, "language_auto": picked is None,
+                        "video_notes": aud["video"], "copy_notes": aud["copy"],
+                        "posting_notes": audience.posting_gap(platform)})
     except Exception as exc:  # noqa: BLE001
         return jsonify({"error": f"Content generator failed: {exc}"}), 500
 

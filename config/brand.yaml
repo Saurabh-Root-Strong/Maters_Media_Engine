@@ -16,3 +16,12 @@ brand:
     - Hype, clickbait, or vague platitudes
     - Guaranteed-return or buy/sell financial advice
     - Sensationalising tragedy or unproven allegations as fact
+  # The language your AUDIENCE reads, per platform ("default" covers the rest).
+  # The content generator writes in this unless you pick another language, and
+  # warns when the text inside a video does not match it. Nov 2026 on this
+  # channel: Hinglish Shorts got 172-1,368 views, English ones 2-21.
+  # Values: english, hindi, hinglish. Delete the block to turn the checks off.
+  languages:
+    default: hinglish
+    linkedin: english
+    twitter: english
