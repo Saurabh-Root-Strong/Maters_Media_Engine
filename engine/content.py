@@ -23,7 +23,7 @@ from contextlib import closing
 
 import yaml
 
-from . import algo, analytics, llm, memory
+from . import algo, analytics, llm, memory, trend_tags
 from .trends import horizon, insight, lookup
 from .trends.text import tokens as _tokens
 
@@ -264,6 +264,13 @@ def _evidence_block(ev: dict, strat: dict) -> str:
         parts.append("RECENT HEADLINES:\n" + "\n".join(f"- {h['title']}" for h in ev["headlines"][:6]))
     if ev.get("phrases"):
         parts.append("WORD PAIRS USED MOST: " + ", ".join(p["phrase"] for p in ev["phrases"]))
+    if ev.get("trend_tags"):
+        parts.append(
+            "TAGS AND HASHTAGS SEVERAL CHANNELS USE ON THIS SUBJECT NOW (last 30 days, most channels first):\n"
+            + ", ".join(f"{'#' if t['kind'] == 'hashtag' else ''}{t['text']} ({t['channels']} channels"
+                        f"{', this week' if t['fresh'] else ''})" for t in ev["trend_tags"])
+            + "\nInclude two or three of these in the hashtags and tags — only ones that truly describe THIS "
+              "video. Never one that names another creator, a stock, an index or an event the video does not cover.")
     look = ev.get("lookup") or {}
     if (look.get("verdict") or {}).get("reasons"):
         parts.append("THIS SUBJECT'S OWN TREND LINES:\n- " + "\n- ".join(look["verdict"]["reasons"]))
@@ -783,6 +790,18 @@ def _vocabulary(seen: dict) -> set[str]:
     return set(re.findall(r"\w+", text.lower()))
 
 
+# Words a trend label may carry beyond what the video says: the niche itself,
+# and intent words that do not change the subject. No "today", "tips", "news".
+_TREND_OK = {"stock", "stocks", "share", "shares", "market", "markets", "stockmarket", "sharemarket", "india",
+             "indian", "trading", "trader", "traders", "investing", "investor", "investors", "investment",
+             "finance", "money", "bazaar", "bazar", "status", "motivation", "motivational", "quotes", "reality",
+             "truth", "life", "mindset", "psychology", "hindi", "hinglish"}
+
+
+def _trend_vocab(topic: str, known: str, seen: dict) -> set[str]:
+    return set(re.findall(r"[^\W_]+", f"{topic}\n{known}".lower())) | _vocabulary(seen) | _TREND_OK
+
+
 def _on_subject(searches: list[str], seen: dict) -> tuple[list[str], set[str]]:
     """Search suggestions that are still about what the post contains, and the
     words that pulled the rest off it. "Stock market peace" suggests "stock
@@ -831,6 +850,7 @@ def analyse(platform: str, topic: str, board: dict | None = None, fetch=None, me
     evidence = insight.analyse(topic, board=board, suggest_feed=spec.get("suggest"), **kwargs)
     evidence["content_type"] = seen.get("content_type") or ("stock_analysis" if _LEVELS.search(notes) else None)
     share = seen.get("content_type") in _SHARE_TYPES
+    noise: set[str] = set()
     if share:
         # A feeling is not on the news. Headlines and tracker counts that match
         # its words are about something else ("peace" → peace talks).
@@ -858,15 +878,20 @@ def analyse(platform: str, topic: str, board: dict | None = None, fetch=None, me
                 yt["videos"] = [v for v in yt["videos"] if not _off_subject(v["title"], noise)]
             if noise and evidence.get("videos"):
                 evidence["videos"] = [v for v in evidence["videos"] if not _off_subject(v["title"], noise)]
+            # Only videos that carry the feeling's own words, not just "market".
+            own = {w for t in (seen.get("search_terms") or []) + [seen.get("core_line") or ""]
+                   for w in re.findall(r"\w+", t.lower())} - _INTENT - _GENERIC_SUBJECT
+            need = 2 if len(own) >= 4 else 1        # "peace" alone is "peace talks"
             if share and yt.get("videos"):
-                # Only videos that carry the feeling's own words, not just "market".
-                own = {w for t in (seen.get("search_terms") or []) + [seen.get("core_line") or ""]
-                       for w in re.findall(r"\w+", t.lower())} - _INTENT - _GENERIC_SUBJECT
-                need = 2 if len(own) >= 4 else 1        # "peace" alone is "peace talks"
                 yt["videos"] = [v for v in yt["videos"] if len(own & set(re.findall(r"\w+", v["title"].lower()))) >= need]
                 yt["phrases"] = [x for x in yt.get("phrases") or []
                                  if own & set(x["phrase"].lower().split()) and not noise & set(x["phrase"].lower().split())
                                  ] if yt["videos"] else []
+            if yt.get("tag_sources"):
+                srcs = [x for x in yt["tag_sources"] if not (noise and _off_subject(x["title"], noise))]
+                if share:
+                    srcs = [x for x in srcs if len(own & set(re.findall(r"\w+", x["title"].lower()))) >= need]
+                yt["tag_sources"] = srcs
             if share and look:
                 look["news"], look["interest"] = None, None
                 look["verdict"] = {"state": "EVERGREEN", "reasons": [
@@ -876,6 +901,11 @@ def analyse(platform: str, topic: str, board: dict | None = None, fetch=None, me
             evidence["searches"] = merged[:15]
         if evidence.get("searches"):
             evidence.setdefault("suggest_feed", "YouTube search" if spec.get("suggest") == "yt" else "Google search")
+    # Tags and hashtags several channels are using on this subject right now.
+    yt = (evidence.get("lookup") or {}).get("youtube") or {}
+    evidence["trend_tags"] = trend_tags.aggregate(
+        yt.get("tag_sources") or [], noise=noise, exclude=set(spec.get("always_hashtags") or []),
+        subject=trend_tags.subject_words(topic, seen.get("subject") or "", *(seen.get("search_terms") or [])))
     # Short term, long term, and any occasion the post is tied to (Diwali,
     # Budget...): when to post, and whether its framing still fits the date.
     try:
@@ -1260,6 +1290,8 @@ def generate(platform: str, topic: str, notes: str = "", language: str = "englis
     short = [h for h in package.get("hashtags") or [] if len(str(h).lstrip("#")) <= 22]
     if package.get("hashtags") and len(short) >= hmin:
         package["hashtags"] = short
+    trends = out["evidence"].get("trend_tags") or []
+    trend_added = trend_tags.add(package, trends, _trend_vocab(topic, known, seen), spec["fields"], language)
     issues = check(package)
     for tag in reversed(spec.get("always_hashtags") or []):
         have = [h for h in package.get("hashtags", []) if str(h).lstrip("#").lower() != tag.lower()]
@@ -1313,6 +1345,8 @@ def generate(platform: str, topic: str, notes: str = "", language: str = "englis
     out.update({"writer": wrote, "writer_model": wrote_model})
     out.update({"review": rv, "ready": ready_to_post(package, spec, rv, out["evidence"].get("content_type")),
                 "ready_warnings": [i for i in issues if "trading levels" in i]})
+    out["trend_used"] = trend_tags.used_in(out["ready"], trends)
+    out["trend_added"] = trend_added
     out.update({"package": package, "limit_notes": limit_notes, "quality_notes": issues, "plan": plan,
                 "past": [{k: p[k] for k in ("created_at", "platform", "topic", "lines")} for p in past],
                 "media_used": bool(seen_media), "owner": owner if seen_media else None,

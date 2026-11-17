@@ -241,7 +241,7 @@ def youtube_pulse(topic: str, now: float, key: str, fetch) -> dict:
          "order": "relevance", "publishedAfter": after, "key": key}))).get("items", [])
     ids = [i["id"]["videoId"] for i in found if i.get("id", {}).get("videoId")]
     if not ids:
-        return {"videos": [], "found": 0}
+        return {"videos": [], "found": 0, "tag_sources": []}
     items = json.loads(fetch(f"{_YT}/videos?" + urllib.parse.urlencode(
         {"part": "snippet,statistics,contentDetails,liveStreamingDetails", "id": ",".join(ids),
          "key": key}))).get("items", [])
@@ -266,11 +266,15 @@ def youtube_pulse(topic: str, now: float, key: str, fetch) -> dict:
         if len(text & q) < need:
             continue
         age_h = max((now - published) / 3600, 1.0)
+        from .. import trend_tags
+        hashtags, tags = trend_tags.harvest(sn)
         vids.append({"title": title, "channel": sn.get("channelTitle", ""), "views": views,
                      "url": f"https://www.youtube.com/watch?v={v['id']}", "kind": sources.video_kind(v),
                      "age_days": round(age_h / 24, 1), "views_per_hour": round(views / age_h),
                      "title_chars": len(title),
-                     "devanagari": bool(re.search(r"[ऀ-ॿ]", title))})
+                     "devanagari": bool(re.search(r"[ऀ-ॿ]", title)),
+                     # what the video is labelled with; aggregated later, after off-subject videos are dropped
+                     "hashtags": hashtags, "tags": tags})
     vids.sort(key=lambda v: -v["views"])
     top = vids[:10]
     pairs: Counter = Counter()
@@ -283,6 +287,9 @@ def youtube_pulse(topic: str, now: float, key: str, fetch) -> dict:
     kinds = Counter(v["kind"] for v in top)
     return {
         "found": len(vids), "videos": vids[:8],
+        # every matching video's labels, for the tags and hashtags creators use on it right now
+        "tag_sources": [{k: v[k] for k in ("title", "channel", "views_per_hour", "age_days", "hashtags", "tags")}
+                        for v in vids],
         "top_kind_mix": dict(kinds),
         "shorts_share_top": round(kinds.get("short", 0) / len(top), 2) if top else 0,
         "median_title_chars": sorted(v["title_chars"] for v in top)[len(top) // 2] if top else None,
@@ -373,6 +380,8 @@ def research(topic: str, now: float | None = None, fetch=None, youtube: bool = T
         out["youtube"] = None
         if youtube:
             hit = _cached(conn, key, "youtube", YT_CACHE_HOURS, now)
+            if hit is not None and "tag_sources" not in (hit.get("data") or {"tag_sources": 0}):
+                hit = None          # cached before tags were kept: look again (still within the daily limit)
             used = conn.execute("SELECT COUNT(*) FROM lookups WHERE part='youtube' AND ts > ?",
                                 (now - 86400,)).fetchone()[0]
             if hit is not None:
